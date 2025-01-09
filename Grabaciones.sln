@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34031.279
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grabaciones", "Grabaciones\Grabaciones.csproj", "{3532EB38-68A1-4246-9DFB-B3C5FBDB3213}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3532EB38-68A1-4246-9DFB-B3C5FBDB3213}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3532EB38-68A1-4246-9DFB-B3C5FBDB3213}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3532EB38-68A1-4246-9DFB-B3C5FBDB3213}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3532EB38-68A1-4246-9DFB-B3C5FBDB3213}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {502074B7-4406-4814-9FB4-708A4A28F9C5}
+	EndGlobalSection
+EndGlobal

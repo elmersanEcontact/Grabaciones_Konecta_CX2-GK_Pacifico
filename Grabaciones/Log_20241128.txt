@@ -1,0 +1,8 @@
+******************      Log   20241128       ******************
+28/11/2024 11:03:25 ==>  La descarga es para el metodo menor a 60 días
+28/11/2024 11:03:30 ==>  Se inicia proceso de descarga 2024-11-04 10:00:00 - 2024-11-05 10:00:00
+28/11/2024 11:03:37 ==>  Las conversaciones a evaluar son del rango:2024-11-04T10:00:00/2024-11-05T10:00:00
+28/11/2024 11:04:04 ==>  Se traerá información de un total de: 1conversaciones(Hits)
+28/11/2024 11:04:37 ==>  Se extrae la información de las grabaciones de la conversación: 4311315c-cef9-4f45-8868-f1b5373ca8f2 y de la grabacion: 68d9ad7e-4dee-41a6-a35c-afdfad39dfd6 - con una duracion de 26
+28/11/2024 11:10:23 ==>  Nombre del audio=>04-11-2024_68d9ad7e-4dee-41a6-a35c-afdfad39dfd6_NNN_945765672
+28/11/2024 11:10:23 ==>  Descarga de audio: D:\Grabaciones/KPCx1/RS/KONECTA_SOAT_RIMAC_TELEMARKETING-Semana-1-noviembre/04-11-2024_68d9ad7e-4dee-41a6-a35c-afdfad39dfd6_NNN_945765672.MP3|https://api-downloads.mypurecloud.com/MediaCache/4311315c-cef9-4f45-8868-f1b5373ca8f2/68d9ad7e-4dee-41a6-a35c-afdfad39dfd6/isDownloading%3Atrue_format%3AMP3_variableWidth%3Atrue_color%3A2719929_version%3Av2_expandAttachments%3Atrue/AUDIO_SGAXDAMBQOMWTSMRSGMZTOMRQGM3DQNJUG43TMLRQGAYHG%3D%3D%3D.MP3?response-content-disposition=attachment%3Bfilename%3D%224311315c-cef9-4f45-8868-f1b5373ca8f2_68d9ad7e-4dee-41a6-a35c-af.MP3%22&Expires=1732813507&Signature=VTvbZYP-Y7dva7R~hqkiPgWqwgrIbT6UzfhIy5ljVqUQlBIMxU~CiPC~~AGLZn~pakp2HP8lH-XBpTfjXjI6KWoIVpVfNAQPf5AYbD2AAl8MILP319qRd0O2b2wylfSEKVpztgfC007L9CwvTq5nB3Ba4COp-tw4SCAjelVKhZLntuvW4hKK23vMzD1M8R~ViRtEvH7jD~GRNZT3hsv3~ih4qvf1JTlUAkDrwaU4HXHbOLJpVWzqxzM5vzocGXq1l1eD8kRHJdJ4Q-5pj5-MI0K3Lx5BVzaUnxMD5Uun~-XqhhWUdf6TtZfU0cP2lw68F-X9yDHdivEqc5xHHYJNoA__&Key-Pair-Id=K1TG4XUGWROLC3

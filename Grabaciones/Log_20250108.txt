@@ -1,0 +1,16 @@
+******************      Log   20250108       ******************
+8/01/2025 18:16:27 ==>  La descarga es para el metodo mayor a 60 días
+8/01/2025 18:16:27 ==>  Se inicia proceso de descarga 2024-11-06 05:00:00 - 2024-11-07 05:00:00
+8/01/2025 18:16:31 ==>  Las conversaciones a evaluar son del rango:
+8/01/2025 18:49:49 ==>  La descarga es para el metodo mayor a 60 días
+8/01/2025 18:49:49 ==>  Se inicia proceso de descarga 2024-11-06 05:00:00 - 2024-11-07 05:00:00
+8/01/2025 18:49:51 ==>  Las conversaciones a evaluar son del rango:
+8/01/2025 18:50:07 ==>  Se extraera un total de: 705 conversaciones
+8/01/2025 18:50:07 ==>  Item: 1 - Conversacion: 604d2805-79f4-40e2-ba83-af5e5103fbf2
+8/01/2025 19:06:30 ==>  La descarga es para el metodo mayor a 60 días
+8/01/2025 19:06:31 ==>  Se inicia proceso de descarga 2024-11-07 05:00:00 - 2024-11-08 05:00:00
+8/01/2025 19:06:34 ==>  Las conversaciones a evaluar son del rango:
+8/01/2025 19:07:11 ==>  Se extraera un total de: 898 conversaciones
+8/01/2025 19:07:11 ==>  Item: 1 - Conversacion: aa8af388-a21e-4261-8c42-57c66e388dae
+8/01/2025 19:07:33 ==>  Item: 2 - Conversacion: 97936ad8-d3bd-4553-ba00-a707df87fa8d
+8/01/2025 19:07:36 ==>  Se extrae la información de las grabaciones de la conversación: 97936ad8-d3bd-4553-ba00-a707df87fa8d y de la grabacion: d2a878f1-b0e9-48d5-8769-bdfff76f3e5b - con una duracion de 17
