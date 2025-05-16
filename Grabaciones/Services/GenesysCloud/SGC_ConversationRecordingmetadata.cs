@@ -6,7 +6,7 @@ namespace Grabaciones.Services.GenesysCloud
 {
     public class SGC_ConversationRecordingmetadata
     {
-        public static List<RecordingMetadata> ObtenerConversationRecordingmetadata(string conversationId, DateTime vFechaInicioIntervalo)
+        public static async Task<List<RecordingMetadata>> ObtenerConversationRecordingmetadata(string conversationId, DateTime vFechaInicioIntervalo)
         {
             var recordingApi = new RecordingApi();
             List<RecordingMetadata> recordingMetadata = new List<RecordingMetadata>();
@@ -14,31 +14,46 @@ namespace Grabaciones.Services.GenesysCloud
 
             try
             {
-                recordingMetadata = recordingApi.GetConversationRecordingmetadata(conversationId);
+                //recordingMetadata = recordingApi.GetConversationRecordingmetadata(conversationId);
+                recordingMetadata = await recordingApi.GetConversationRecordingmetadataAsync(conversationId);
 
             }
             catch (Exception ex)
             {
 
-                Console.WriteLine("Error GetConversationRecordingmetadata: " + conversationId +"-"+ex.Message.ToString());
+                Console.WriteLine("Error GetConversationRecordingmetadataAsync: " + conversationId +"-"+ex.Message.ToString());
 
             }
 
-            foreach(var _item in recordingMetadata) { 
-                   
+            #region Validar si la grabacion existe segun la fecha de inicio
+            //foreach (var _item in recordingMetadata) { 
+
+            //    DateTime _startTime = DateTime.Parse(_item.StartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            //    _startTime = _startTime.AddHours(-5).Date;
+
+            //    // Validar si coinciden en el mismo día
+            //    bool isSameDay = _startTime == vFechaInicioIntervalo.Date;
+
+            //    if (isSameDay)
+            //    {
+            //        recordingMetadataRespuesta.Add(_item);
+            //    }
+            //}
+
+            foreach (var _item in recordingMetadata)
+            {
+
                 DateTime _startTime = DateTime.Parse(_item.StartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
                 _startTime = _startTime.AddHours(-5).Date;
 
                 // Validar si coinciden en el mismo día
                 bool isSameDay = _startTime == vFechaInicioIntervalo.Date;
-
-                if (isSameDay)
-                {
-                    recordingMetadataRespuesta.Add(_item);
-                }
-
-
+                
+                recordingMetadataRespuesta.Add(_item);
+               
             }
+
+            #endregion
 
             return recordingMetadataRespuesta;
 

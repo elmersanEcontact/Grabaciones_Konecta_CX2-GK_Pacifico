@@ -38,13 +38,15 @@ namespace Grabaciones.Services.Repositorio
             string [] arrNombresemanaUltimoDia = vRespuestSemana.Split('|'); //await _ecMetodos.GetWeekRangeAsync(FechaInicio, FechaFin);
 
             string _nombresemana = arrNombresemanaUltimoDia[0];
+            
             #endregion
 
             #region valido que el valor de fechainicio sea el ultimo día de la semana
             //bool ultimodiadelasemana = FechaInicio.DayOfWeek == DayOfWeek.Sunday;
             bool ultimodiadelasemana = arrNombresemanaUltimoDia[1]=="Domingo";
+            int iAnio = FechaInicio.Year;
             #endregion
-       
+
             #region Enviroment
             List<XmlGrabaciones> L_GC_RecordingsXml_Path = new List<XmlGrabaciones>();
             List<GC_LeerCsv> ArchivosCsvJuntos = new List<GC_LeerCsv>();
@@ -128,7 +130,7 @@ namespace Grabaciones.Services.Repositorio
                         //Console.WriteLine("Item: " + conteoConversaciones + " - Conversacion:" + conversation.ConversationId);
                         #region metadata de conversacion según conversationId
 
-                        List<RecordingMetadata> vRecordingMetadata = SGC_ConversationRecordingmetadata.ObtenerConversationRecordingmetadata(conversation.ConversationId, vFechaInicioIntervalo);
+                        List<RecordingMetadata> vRecordingMetadata =await SGC_ConversationRecordingmetadata.ObtenerConversationRecordingmetadata(conversation.ConversationId, vFechaInicioIntervalo);
 
                         string? vOriginatingDirection = conversation.OriginatingDirection.ToString();
                         foreach (var iRecording in vRecordingMetadata)
@@ -146,7 +148,8 @@ namespace Grabaciones.Services.Repositorio
                             string recordinId = iRecording.Id;
                             Recording DatosMP3 = new Recording();
                             EC_EscribirLog.EscribirLog("Se extrae la información de las grabaciones de la conversación: " + iRecording.ConversationId + " y de la grabacion: " + iRecording.Id + " - con una duracion de "+nDiferenciaSegundos.ToString());
-                            DatosMP3 = SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config);
+                            var rateLimiter = new SimpleRateLimiter(4);
+                            DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
 
                             #region datos que ayudan en la generación de archivo xml y descarga ed audio
 
@@ -355,7 +358,7 @@ namespace Grabaciones.Services.Repositorio
                                                 _nombre = _key == "vNombre" ? _value == "" ? _nombre : _value : _nombre;
                                                 _apellidoPaterno = _key == "vApellidoPaterno" ? _value == "" ? _apellidoPaterno : _value : _apellidoPaterno;
                                                 eNombreApellidos = string.Concat(_nombre.Split(' ')[0], " ", _apellidoPaterno);
-                                                eNombreApellidos = _ecMetodos.EliminarCaracteresEspeciales(eNombreApellidos);
+                                                eNombreApellidos = await _ecMetodos.EliminarCaracteresEspeciales(eNombreApellidos);
                                                 eDniTitular = _key == "vDocumento" ? _value == "" ? eDniTitular : _value : eDniTitular;
                                             }
                                         }
@@ -396,7 +399,7 @@ namespace Grabaciones.Services.Repositorio
                             #endregion
 
                             string NombredelAudio = string.Concat(eDia, "-", eMes, "-", eAnio, "_", _RecordingId, "_", eNombreApellidos.Replace(" ", "-").Replace(@"\","").Replace(@"/", ""), "_", _Telefono);
-                            NombredelAudio = _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
+                            NombredelAudio = await _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
                             EC_EscribirLog.EscribirLog($"Nombre del audio=>{NombredelAudio}");
                             _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
                             _NomenclaturaAudioGSM = NombredelAudio + ".gsm";
@@ -420,7 +423,7 @@ namespace Grabaciones.Services.Repositorio
                             xmlGrabaciones.xmlRutaCompletaAudioMP3 = _directorio + "/" + _NomenclaturaAudioMP3;
                             xmlGrabaciones.xmlRutaCompletaAudioGSM = _directorio + "/" + _NomenclaturaAudioGSM;
                             xmlGrabaciones.xmlNombreAudioExcel = _NombreAudioExcel;
-                            xmlGrabaciones.eParteDisco = eParteDisco;
+                           
                             xmlGrabaciones.eFecha = eFecha;
                             xmlGrabaciones.eAnio = eAnio;
                             xmlGrabaciones.eMes = eMes;
@@ -428,22 +431,55 @@ namespace Grabaciones.Services.Repositorio
                             xmlGrabaciones.eHora = eHora;
                             xmlGrabaciones.eNombreApellidos = eNombreApellidos == "" ? "NNN" : eNombreApellidos;
                             xmlGrabaciones.eDniTitular = eDniTitular;
-                            xmlGrabaciones.ePlaca = ePlaca;
-                            xmlGrabaciones.ePlan = ePlan;
-                            xmlGrabaciones.ePrima = ePrima;
+                         
                             eCelularCliente = _ecMetodos.ValidarSiesCelular(_Telefono);
                             xmlGrabaciones.eCelularCliente = eCelularCliente;
                             eFijoCliente = _ecMetodos.ValidarSiesFijo(_Telefono);
-                            xmlGrabaciones.eFijoCliente = eFijoCliente;
+                            
                             xmlGrabaciones.eDniAsesor = eDniAsesor;
-                            xmlGrabaciones.eNombreApellidosAsesor = NombreApellidosAsesor;
-                            xmlGrabaciones.eCodigo = eCodigo;
-                            xmlGrabaciones.eEtiqueta = _NomenclaturaAudioGSM;
-                            xmlGrabaciones.eParteGrabacion = eParteGrabacion;
+                            
                             xmlGrabaciones.eDatosdelLogindelAsesor = eDatosdelLogindelAsesor;
                             xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
                             xmlGrabaciones.xmldirectorioFTP = _directorioFTP.Replace("\\", @"\");
                             xmlGrabaciones.xmlArchivolocal = _archivolocal;
+
+
+                            #region metodo para crear directorio y descargar el audio en MP3
+                                #region Crear directorio
+                                try
+                                {
+                                    _ecMetodos.CrearDirectorio(xmlGrabaciones.xmlRutadeAudio);
+                                }
+                                catch (Exception ex)
+                                {
+                                    EC_EscribirLog.EscribirLog($"Error al crearDirectorio: {ex.Message.ToString()}");
+                                    Console.WriteLine("Error: " + ex.Message.ToString());
+                                    throw;
+                                }
+                                #endregion
+
+                                #region Descargar audio
+                                //bool descargaExitosa = false;
+                                try
+                                {
+                                    xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
+
+                                    if (!xmlGrabaciones.xmlAudioDescargado)
+                                    {
+                                        EC_EscribirLog.EscribirLog($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
+                                        continue;
+                                    }
+                                
+                                }
+                                catch (Exception ex)
+                                {
+                                    EC_EscribirLog.EscribirLog($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {xmlGrabaciones.conversationID}| recordingID: {xmlGrabaciones.xmlRecordingID}");
+                                    continue;
+                                }
+                                #endregion
+                                
+                            #endregion
+
 
                             #endregion
                             listXmlGrabaciones.Add(xmlGrabaciones);
@@ -480,41 +516,10 @@ namespace Grabaciones.Services.Repositorio
                     }
                     else
                     {
-                        #region Crear directorio
-                        try
-                        {
-                            _ecMetodos.CrearDirectorio(iGrabaciones.xmlRutadeAudio);
-                        }
-                        catch (Exception ex)
-                        {
-                            EC_EscribirLog.EscribirLog($"Error al crearDirectorio: {ex.Message.ToString()}");
-                            Console.WriteLine("Error: " + ex.Message.ToString());
-                            throw;
-                        }
-                        #endregion
-
-                        #region Descargar audio
-                        bool descargaExitosa = false;
-                        try
-                        {
-                            descargaExitosa =  await _ecMetodos.DownloadFileAsync(iGrabaciones.xmlRutaCompletaAudioMP3, iGrabaciones.xmlUrlGCAudio);
-                            
-                            if (!descargaExitosa)
-                            {
-                                EC_EscribirLog.EscribirLog($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {iGrabaciones.conversationID} | recordingID: {iGrabaciones.xmlRecordingID}");
-                                continue;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            EC_EscribirLog.EscribirLog($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {iGrabaciones.conversationID}| recordingID: {iGrabaciones.xmlRecordingID}");
-                            continue;
-                        }
-                        #endregion
-
+                        
                         #region Convertir el audio descargado en GSM
                         bool respuestaAudio = false;
-                        if (descargaExitosa)
+                        if (iGrabaciones.xmlAudioDescargado)
                         {
                             try
                             {
@@ -526,14 +531,11 @@ namespace Grabaciones.Services.Repositorio
                                 {
                                     #region campos para el objeto
                                     objExcel.semana = _nombresemana;
-                                    objExcel.directorioExcel = @"" + iGrabaciones.xmlRutadeAudio + @"\" + iGrabaciones.eProveedor + "_" + iGrabaciones.eProducto + "_" + iGrabaciones.eSponsor + "_" + iGrabaciones.eCanal + "-" + _nombresemana + ".xlsx";
-                                    objExcel.archivoExcel = @"" + iGrabaciones.eProveedor + "_" + iGrabaciones.eProducto + "_" + iGrabaciones.eSponsor + "_" + iGrabaciones.eCanal + "-" + _nombresemana + ".xlsx";
+                                    //objExcel.directorioExcel = @"" + iGrabaciones.xmlRutadeAudio + @"\" + iGrabaciones.eProveedor + "_" + iGrabaciones.eProducto + "_" + iGrabaciones.eSponsor + "_" + iGrabaciones.eCanal + "-" + _nombresemana + ".xlsx";
+                                    //objExcel.archivoExcel = @"" + iGrabaciones.eProveedor + "_" + iGrabaciones.eProducto + "_" + iGrabaciones.eSponsor + "_" + iGrabaciones.eCanal + "-" + _nombresemana + ".xlsx";
                                     objExcel.ruta = @"" + xmlRutaFtp + "-" + _nombresemana + @"\" + iGrabaciones.xmlNombreAudioExcel;
                                     objExcel.proveedor = iGrabaciones.eProveedor;
-                                    objExcel.producto = iGrabaciones.eProducto;
-                                    objExcel.parteDisco = iGrabaciones.eParteDisco;
-                                    objExcel.canal = iGrabaciones.eCanal;
-                                    objExcel.sponsor = iGrabaciones.eSponsor;
+                                   
                                     objExcel.fecha = iGrabaciones.eFecha;
                                     objExcel.anio = iGrabaciones.eAnio;
                                     objExcel.mes = iGrabaciones.eMes;
@@ -541,16 +543,11 @@ namespace Grabaciones.Services.Repositorio
                                     objExcel.hora = iGrabaciones.eHora;
                                     objExcel.nombresYApellidosdelTitular = iGrabaciones.eNombreApellidos;
                                     objExcel.dniDelTitular = iGrabaciones.eDniTitular;
-                                    objExcel.nPlaca = iGrabaciones.ePlaca;
-                                    objExcel.plan = iGrabaciones.ePlan;
-                                    objExcel.prima = iGrabaciones.ePrima;
+                                    
                                     objExcel.celularDelCliente = iGrabaciones.eCelularCliente;
-                                    objExcel.fijoDelCliente = iGrabaciones.eFijoCliente;
+                                    
                                     objExcel.dniDelAsesor = iGrabaciones.eDniAsesor;
-                                    objExcel.nombresYApellidosdelAsesor = iGrabaciones.eNombreApellidosAsesor;
-                                    objExcel.codigo = iGrabaciones.eCodigo;
-                                    objExcel.etiqueta = iGrabaciones.eEtiqueta;
-                                    objExcel.parteGrabacion = iGrabaciones.eParteGrabacion;
+                                    
                                     objExcel.datoDelLoginDelAsesor = iGrabaciones.eDatosdelLogindelAsesor;
                                     objExcel.conversationId = iGrabaciones.conversationID;
                                     objExcel.recordingId = iGrabaciones.xmlRecordingID;
@@ -591,13 +588,30 @@ namespace Grabaciones.Services.Repositorio
                             }
                         }
                         #endregion
+
+                        #region subir a repositorio de amazon S3
+                        if (respuestaAudio)
+                        {
+                            try
+                            {
+                                var resultS3 = _ecMetodos.SubirArchivosSFTAmazon(iGrabaciones.xmlRutaCompletaAudioGSM, _nombresemana, iGrabaciones.eAnio);
+                            }
+                            catch (Exception ex)
+                            {
+                                EC_EscribirLog.EscribirLog($"Error al subir archivo al S3 de Konecta: {ex.Message}");
+                                throw;
+                            }
+                        }
+                        #endregion
                     }
                 }
 
                 #region crear archivo csv por día
                 try
                 {
-                    var respuesta = _ecMetodos.CrearArchivoCsv(listImprimirExcel);
+                    //var respuesta = _ecMetodos.CrearArchivoCsv(listImprimirCSV);
+
+                  //  var respuestaS3 = _ecMetodos.SubirArchivosSFTAmazon($"{listImprimirExcel[0].archivoCsv}.csv", _nombresemana, listImprimirExcel[0].anio);
                 }
                 catch (Exception ex)
                 {
@@ -640,6 +654,8 @@ namespace Grabaciones.Services.Repositorio
 
                 #region Imprimir Excel con los audios descargados
                 _ecMetodos.CrearArchivoExcel(ArchivosCsvJuntos);
+
+                await _ecMetodos.SubirArchivosSFTAmazon(ArchivosCsvJuntos[0].ArchivoExcel, _nombresemana, iAnio.ToString());
 
                 #endregion
 

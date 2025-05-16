@@ -22,6 +22,7 @@
         public string? xmlRutadeAudio { get; set; }
         public string? xmlNomenclaturaAudio { get; set; }
         public string? xmlRutaCompletaAudioMP3 { get; set; }
+        public bool xmlAudioDescargado { get; set; }
         public string? xmlRutaCompletaAudioGSM { get; set; }
         public string? xmlNombreAudioExcel { get; set; }
         public string? xmlUrlGCAudio { get; set; }
@@ -29,15 +30,34 @@
         public string? xmlArchivolocal { get; set; }
 
 
+        /// <summary>
+        // -------- campos para la informacion de yanbal ---
+        public string? IdRecording { get; set; }
+        public string? ConversationId { get; set; }
+        public string? Direction { get; set; }
+        public string? ConversationStartTime { get; set; }
+        public string? ConversationEndTime { get; set; }
+        public string? Userid { get; set; }
+        public string? Agentid { get; set; }
+        public string? WrapUpCode { get; set; }
+        public long? Duration { get; set; }
+        public long? ACW { get; set; }
+        public string? ANI { get; set; }
+        public string? QueueName { get; set; }
+        public string? NameDivision { get; set; }
+        public string? IVRSelection { get; set; }
+        public long? HoldTime { get; set; }
+        public string? Dnis { get; set; }
+
+       
+       
+        /// </summary>
+
 
 
 
         // datos segun Excel
         public string? eProveedor { get; set; } = "KONECTA";
-        public string? eProducto { get; set; } = "SOAT";
-        public string? eParteDisco { get; set; }
-        public string? eCanal { get; set; } = "TELEMARKETING";
-        public string? eSponsor { get; set; } = "RIMAC";
         public string? eFecha { get; set; }
         public string? eAnio { get; set; }
         public string? eMes { get; set; }
@@ -45,16 +65,8 @@
         public string? eHora { get; set; }
         public string? eNombreApellidos { get; set; }
         public string? eDniTitular { get; set; }
-        public string? ePlaca { get; set; }
-        public string? ePlan { get; set; }
-        public string? ePrima { get; set; }
         public string? eCelularCliente { get; set; }
-        public string? eFijoCliente { get; set; }
         public string? eDniAsesor { get; set; }
-        public string? eNombreApellidosAsesor { get; set; }
-        public string? eCodigo { get; set; }
-        public string? eEtiqueta { get; set; }
-        public string? eParteGrabacion { get; set; }
         public string? eDatosdelLogindelAsesor { get; set; }
 
         #endregion

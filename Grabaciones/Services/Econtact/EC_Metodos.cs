@@ -19,11 +19,14 @@ using System.Globalization;
 using Newtonsoft.Json;
 using DocumentFormat.OpenXml.Drawing;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using Path = DocumentFormat.OpenXml.Drawing.Path;
+
 using System.Formats.Asn1;
 using CsvHelper.Configuration;
 using CsvHelper;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Renci.SshNet;
+using Renci.SshNet.Sftp;
+using System.Threading.Tasks;
 
 namespace Grabaciones.Services.Econtact
 {
@@ -39,28 +42,35 @@ namespace Grabaciones.Services.Econtact
         }
 
         #region Crear Directorio
-        public void CrearDirectorio(string Ruta)
+        public Task<bool> CrearDirectorio(string Ruta)
         {
             string path = Ruta;
-            try
+
+            return Task.Run(() =>
             {
-                // Determine whether the directory exists.
-                if (Directory.Exists(path))
+                try
                 {
-                    Console.WriteLine("That path exists already.");
+                    // Determine whether the directory exists.
+                    if (Directory.Exists(path))
+                    {
+                        Console.WriteLine("That path exists already.");
+                        return false;
+                    }
+                    else
+                    {
+                        DirectoryInfo di = Directory.CreateDirectory(path);
+                        //Console.WriteLine("The directory was created successfully at {0}.", Directory.GetCreationTime(path));
+                        EC_EscribirLog.EscribirLog($"El directorio a sido creado de forma exitosa {0}. {Directory.GetCreationTime(path)}");
+                        return true;
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    DirectoryInfo di = Directory.CreateDirectory(path);
-                    Console.WriteLine("The directory was created successfully at {0}.", Directory.GetCreationTime(path));
+                    Console.WriteLine("Error: al momento de crear la carpeta" + e.ToString());
+                    throw;
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Error: al momento de crear la carpeta" + e.ToString());
-                throw;
-            }
-            //return Respuesta = _respuesta == true ? "Nuevo" : "Existe";
+                //return Respuesta = _respuesta == true ? "Nuevo" : "Existe";
+            });
         }
         #endregion  
 
@@ -117,20 +127,10 @@ namespace Grabaciones.Services.Econtact
 		#region Validar el telefono y reemplazar caracteres por vacio
 		public string ReemplazarTelefonoxVacio(string telefonoxVacio)
 		{
-			string vTelefono = telefonoxVacio.Replace("tel:51", "")
-											 .Replace("tel:0051", "")
-											 .Replace("tel:+51", "")
-                                             .Replace("tel:399551", "")
-                                             .Replace("tel:405651", "")
-                                             .Replace("tel:", "")
-											 .Replace("+", "")
-											 .Replace("0051", "")
-											 .Replace("sip:", "")
-											 .Replace("sip:51", "")
-											 .Replace("sip:+51", "")
-											 .Replace("sip:0051", "")
-											 ;
-			return vTelefono;
+			string vTelefono = telefonoxVacio.Replace("tel:", "")
+                                             .Replace("tel:+", "")
+                                             .Replace("+", "");
+            return vTelefono;
 		}
         //405651976494542
         #endregion
@@ -178,52 +178,150 @@ namespace Grabaciones.Services.Econtact
             {
                // Process cmd = new Process();
 
-                try
-                {
-                    using (var cmd = new Process())
+               
+                    #region proceso antiguo para convertir audios de mp3 a gsm
+                    //using (var cmd = new Process())
+                    //{
+
+
+                    //    cmd.StartInfo.FileName = "cmd.exe";
+                    //    cmd.StartInfo.RedirectStandardInput = true;
+                    //    cmd.StartInfo.RedirectStandardOutput = true;
+                    //    cmd.StartInfo.RedirectStandardError = true;
+                    //    cmd.StartInfo.CreateNoWindow = true;
+                    //    cmd.StartInfo.UseShellExecute = false;
+
+                    //    cmd.Start();
+
+                    //    string? ejecutable = appConversorAudio;
+                    //    cmd.StandardInput.WriteLine($"{ejecutable} -i \"{inputFile}\" -codec:a libmp3lame -qscale:a 2 -b:a 320000 \"{outputFile}\"");
+                    //    cmd.StandardInput.Flush();
+                    //    cmd.StandardInput.Close();
+                    //    //cmd.WaitForExit();
+
+                    //    if(!cmd.WaitForExit(300000))
+                    //    {
+                    //        EC_EscribirLog.EscribirLog($"Error en convertir de OPUS a GSM: Tiempo de espera exedido para {inputFile}");
+                    //        cmd.Kill(); // Forzar la terminación del proceso de conversión de audio
+                    //    //    return false;
+                    //    }
+
+
+                    //    string output = cmd.StandardOutput.ReadToEnd();
+                    //    string error = cmd.StandardError.ReadToEnd();
+
+                    //    if (!string.IsNullOrEmpty(error) && !File.Exists(outputFile))
+                    //    {
+                    //        EC_EscribirLog.EscribirLog($"Error en ConvertMp3ToGsm conversión: {error}");
+                    //        return false;
+                    //    }
+
+                    //    if (File.Exists(outputFile))
+                    //    {
+                    //        EC_EscribirLog.EscribirLog($"Archivo convertido exitosamente en ConvertMp3ToGsm: {outputFile}");
+                    //        return true;
+                    //    }
+                    //    else
+                    //    {
+                    //        EC_EscribirLog.EscribirLog($"Error en ConvertMp3ToGsm: El archivo de salida no se generó: {outputFile}");
+                    //        return false;
+                    //    }
+                    //}
+                    #endregion
+
+                    #region Proceso para convertir audios de mp3 a gsm
+                    using(var process = new Process())
                     {
-                        cmd.StartInfo.FileName = "cmd.exe";
-                        cmd.StartInfo.RedirectStandardInput = true;
-                        cmd.StartInfo.RedirectStandardOutput = true;
-                        cmd.StartInfo.RedirectStandardError = true;
-                        cmd.StartInfo.CreateNoWindow = true;
-                        cmd.StartInfo.UseShellExecute = false;
+                        // configurar el proceso
+                        process.StartInfo.FileName = "cmd.exe";
+                        process.StartInfo.Arguments = $"/c \"{appConversorAudio} -i \"{inputFile}\" -codec:a libmp3lame -qscale:a 2 -b:a 320000 \"{outputFile}\"\"";
+                        process.StartInfo.UseShellExecute = false;  
+                        process.StartInfo.CreateNoWindow= true;
 
-                        cmd.Start();
+                        //redigirigir salidas
+                        process.StartInfo.RedirectStandardOutput = true;
+                        process.StartInfo.RedirectStandardError = true;
 
-                        string? ejecutable = appConversorAudio;
-                        cmd.StandardInput.WriteLine($"{ejecutable} -i \"{inputFile}\" -codec:a libmp3lame -qscale:a 2 -b:a 320000 \"{outputFile}\"");
-                        cmd.StandardInput.Flush();
-                        cmd.StandardInput.Close();
-                        cmd.WaitForExit();
-
-                        string output = cmd.StandardOutput.ReadToEnd();
-                        string error = cmd.StandardError.ReadToEnd();
-
-                        if (!string.IsNullOrEmpty(error))
+                        //captar eventos asincronos
+                        process.OutputDataReceived += (sender, e) =>
                         {
-                            EC_EscribirLog.EscribirLog($"Error en ConvertMp3ToGsm conversión: {error}");
-                            return false;
-                        }
+                            if (!string.IsNullOrEmpty(e.Data))
+                            {
+                                // porias registrar la salida si quieres
+                                EC_EscribirLog.EscribirLog($"STDOUT: {e.Data}");
+                            }
+                        };
 
-                        if (File.Exists(outputFile))
+                        process.ErrorDataReceived += (sender, e) =>
                         {
-                            EC_EscribirLog.EscribirLog($"Archivo convertido exitosamente en ConvertMp3ToGsm: {outputFile}");
+                            if (!string.IsNullOrEmpty(e.Data))
+                            {
+                                // podras registrar la salida si quieres
+                                EC_EscribirLog.EscribirLog($"STDERR: {e.Data}");
+                            }
+                        };
+
+                        try
+                        {
+                            // Iniciar el proceso
+                            process.Start();
+
+                            // comenzar lectura asincrona
+                            process.BeginOutputReadLine();
+                            process.BeginErrorReadLine();
+
+                            // esperar con un timeout (ej. 5 minutos)
+                            bool exited = process.WaitForExit(120000); // 2 minutos
+                            
+                            //importante liberamos el procesos
+                            process.Close();
+
+                            if(!exited )
+                            {
+                                // se agotó el tiempo de espera, forzamos el cierre
+                                process.Kill();
+                                EC_EscribirLog.EscribirLog($"Error: FFmpeg excedió el tiempo de espera");
+                                return false;
+                            }
+                            //validar si se genero el archivo
+                            if (File.Exists(outputFile))
+                            {
+                            EC_EscribirLog.EscribirLog($"Éxito: El archivo de salida GSM {outputFile}, se genero de manera correcta");
+
+                            for (int i = 0;i<3; i++)
+                            {
+                                try
+                                {
+                                    File.Delete(inputFile);
+                                    EC_EscribirLog.EscribirLog($"Archivo {inputFile}, eliminado de forma correcta"); 
+                                    break;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Thread.Sleep(500);
+                                    EC_EscribirLog.EscribirLog($"Error al intentar eliminar el archivo mp3  | Mensaje de error: {ex.Message}");
+                                }
+
+                            }
                             return true;
-                        }
+                            }
                         else
                         {
-                            EC_EscribirLog.EscribirLog($"Error en ConvertMp3ToGsm: El archivo de salida no se generó: {outputFile}");
+                            EC_EscribirLog.EscribirLog($"Error: El archivo de salida no se generó de forma correcta.");
                             return false;
                         }
-                    }
+
+                        }
+                        catch (Exception ex)
+                        {
+                            EC_EscribirLog.EscribirLog($"Error: {ex.Message.ToString()}");
+                            return false;
+                            // throw;
+                        }
+
                 }
-                catch (Exception ex)
-                {
-                    EC_EscribirLog.EscribirLog($"Error: {ex.Message.ToString()}");
-                    return false;
-                   // throw;
-                }
+                    #endregion
+               
             }
 		}
 		#endregion
@@ -583,7 +681,6 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-
         #region Obtener Semana del mes
         private static int GetWeekOfMonth(System.DateTime date)
         {
@@ -594,6 +691,13 @@ namespace Grabaciones.Services.Econtact
             TimeSpan difference = date - firstDayOfMonth;
             int weekNumber = (difference.Days / 7) + 1; // +1 porque la primera semana cuenta como semana 1
             return weekNumber;
+        }
+        #endregion
+
+        #region Obtener el nombre del mes
+        public string ObtenerNombreDelMes(System.DateTime startDate)
+        {
+            return  startDate.ToString("MMMM", new CultureInfo("es-ES")).ToUpper();
         }
         #endregion
 
@@ -745,7 +849,6 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-
         #region Escribir archivo Log
         public async void EscribirLog(string Message)
         {
@@ -802,15 +905,14 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-
         #region Crear archivo csv
-        public async Task CrearArchivoCsv(List<GC_ImprimirExcel> listImprimirExcel)
+        public async Task CrearArchivoCsv(List<EC_CSVYanbal> listImprimirCSV)
         {
 
+            string RutaArchivo = listImprimirCSV[0].DirectorioCSV;
+            string NombreArchivo = $"{RutaArchivo}/Grabaciones.csv";
 
-
-            //string RutaArchivo = listImprimirExcel[0].;
-            string NombreArchivo = listImprimirExcel[0].archivoCsv+".csv";
+            //string NombreArchivo = $"C:/Elmer/Pruebas/Grabaciones/Yanbal/Yanbal/Yanbal/Yanbal_Konecta/ArchivoYabal.csv";
 
             string filePath = NombreArchivo;
             // Configuración de CsvHelper con el delimitador personalizado
@@ -824,75 +926,46 @@ namespace Grabaciones.Services.Econtact
             using (var csv = new CsvWriter(writer, csvConfig))
             {
                 // Escribir los datos de cada objeto en la lista
-                csv.WriteField("Semana");
-                csv.WriteField("DirectorioExcel");
-                csv.WriteField("ArchivoExcel");
-                csv.WriteField("Ruta");
-                csv.WriteField("Proveedor");
-                csv.WriteField("Producto");
-                csv.WriteField("ParteDisco");
-                csv.WriteField("Canal");
-                csv.WriteField("Sponsor");
-                csv.WriteField("Fecha");
-                csv.WriteField("Anio");
-                csv.WriteField("Mes");
-                csv.WriteField("Dia");
-                csv.WriteField("Hora");
-                csv.WriteField("NombresYApellidosdelTitular");
-                csv.WriteField("DniDelTitular");
-                csv.WriteField("NPlaca");
-                csv.WriteField("Plan");
-                csv.WriteField("Prima");
-                csv.WriteField("CelularDelCliente");
-                csv.WriteField("FijoDelCliente");
-                csv.WriteField("DniDelAsesor");
-                csv.WriteField("NombresYApellidosdelAsesor");
-                csv.WriteField("Codigo");
-                csv.WriteField("Etiqueta");
-                csv.WriteField("ParteGrabacion");
-                csv.WriteField("DatoDelLoginDelAsesor");
-                csv.WriteField("ConversationId");
-                csv.WriteField("RecordingId");
-                csv.WriteField("ArchivoCsv");
-               
+                csv.WriteField("ID_ recording");
+                csv.WriteField("Conversationid");
+                csv.WriteField("Direction");
+                csv.WriteField("Duration");
+                csv.WriteField("Conversation StartTime");
+                csv.WriteField("Conversation EndTime");
+                csv.WriteField("Userid");
+                csv.WriteField("Agentid");
+                csv.WriteField("Wrap Up Code");
+                csv.WriteField("ACW");
+                csv.WriteField("ANI");
+                csv.WriteField("Queue_name");
+                csv.WriteField("Name División");
+                csv.WriteField("IVR selection");
+                csv.WriteField("Hold Time");
+                csv.WriteField("Dnis");
 
                 csv.NextRecord();
 
-                foreach (var item in listImprimirExcel)
+                foreach (var item in listImprimirCSV)
                 {
                     //string cleanedMessage = dialog.Message.Replace("\n", "").Replace("\r", "");
 
-                    csv.WriteField(item.semana);
-                    csv.WriteField(item.directorioExcel);
-                    csv.WriteField(item.archivoExcel);
-                    csv.WriteField(item.ruta);
-                    csv.WriteField(item.proveedor);
-                    csv.WriteField(item.producto);
-                    csv.WriteField(item.parteDisco);
-                    csv.WriteField(item.canal);
-                    csv.WriteField(item.sponsor);
-                    csv.WriteField(item.fecha);
-                    csv.WriteField(item.anio);
-                    csv.WriteField(item.mes);
-                    csv.WriteField(item.dia);
-                    csv.WriteField(item.hora);
-                    csv.WriteField(item.nombresYApellidosdelTitular);
-                    csv.WriteField(item.dniDelTitular);
-                    csv.WriteField(item.nPlaca);
-                    csv.WriteField(item.plan);
-                    csv.WriteField(item.prima);
-                    csv.WriteField(item.celularDelCliente);
-                    csv.WriteField(item.fijoDelCliente);
-                    csv.WriteField(item.dniDelAsesor);
-                    csv.WriteField(item.nombresYApellidosdelAsesor);
-                    csv.WriteField(item.codigo);
-                    csv.WriteField(item.etiqueta);
-                    csv.WriteField(item.parteGrabacion);
-                    csv.WriteField(item.datoDelLoginDelAsesor);
-                    csv.WriteField(item.conversationId);
-                    csv.WriteField(item.recordingId);
-                    csv.WriteField(item.archivoCsv);
-
+                    csv.WriteField(item.IdRecording);
+                    csv.WriteField(item.ConversationId);
+                    csv.WriteField(item.Direction);
+                    csv.WriteField(item.Duration/1000);
+                    csv.WriteField(item.ConversationStartTime);
+                    csv.WriteField(item.ConversationEndTime);
+                    csv.WriteField(item.Userid);
+                    csv.WriteField(item.Agentid);
+                    csv.WriteField(item.WrapUpCode);
+                    csv.WriteField(item.ACW/1000);
+                    csv.WriteField(item.ANI);
+                    csv.WriteField(item.QueueName);
+                    csv.WriteField(item.NameDivision);
+                    csv.WriteField(item.IVRSelection);
+                    csv.WriteField(item.HoldTime/1000);
+                    csv.WriteField(item.Dnis);
+                    
                     csv.NextRecord();
                 }
             }
@@ -966,21 +1039,117 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Quitar caracteres especiales a cadena para nomenclatura de audios
-        public string EliminarCaracteresEspeciales(string cadena)
+        public Task<string>EliminarCaracteresEspeciales(string cadena)
         {
-            string cadenaNueva = string.Empty;
+            return Task.Run(() =>
+            {
+                string cadenaNueva = string.Empty;
 
-            // Obtener los caracteres no permitidos en Windows
-            char[] invalidChars = System.IO.Path.GetInvalidFileNameChars();
+                // Obtener los caracteres no permitidos en Windows
+                char[] invalidChars = System.IO.Path.GetInvalidFileNameChars();
 
-            // Reemplazar los caracteres no permitidos por una cadena vacía
-            cadenaNueva = new string(cadena
-                .Where(ch => !invalidChars.Contains(ch))
-                .ToArray());
+                // Reemplazar los caracteres no permitidos por una cadena vacía
+                cadenaNueva = new string(cadena
+                    .Where(ch => !invalidChars.Contains(ch))
+                    .ToArray());
 
-            return cadenaNueva;
+                return cadenaNueva;
+            });
         }
 
+        #endregion
+
+        #region Subir los archivos en sftp de amazon
+        public async Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio)
+        {
+
+            string? host = _config.GetValue<string>("ConfigurationSFTPAmazon:Host");
+            string? username = _config.GetValue<string>("ConfigurationSFTPAmazon:Username");
+            string? privateKeyFilePath = _config.GetValue<string>("ConfigurationSFTPAmazon:PrivateKeyFilePath");
+            string? remoteDirectory = $"{_config.GetValue<string>("ConfigurationSFTPAmazon:RutaServidor")}/{anio}/{nombreSemana}";
+
+            try
+            {
+
+                // Cargamos el archivo de clave privada
+                var keyFile = new PrivateKeyFile(privateKeyFilePath);
+                var keyFiles = new[] { keyFile };
+
+
+                // Creamos el método de autenticación con clave privada.
+                // Si necesitas password, puedes combinarlo con PasswordAuthenticationMethod.
+                var authMethods = new AuthenticationMethod[]
+                {
+                new PrivateKeyAuthenticationMethod(username, keyFiles)
+                };
+
+                var connectionInfo = new Renci.SshNet.ConnectionInfo(
+                host,
+                username,
+                authMethods
+                );
+
+                using (var sftpClient = new SftpClient(connectionInfo))
+                {
+                    // Nos conectamos al servidor
+                    sftpClient.Connect();
+
+                    #region Crear directorio en el servidor remoto
+                        // Validar si el directorio remoto existe, si no, crearlo.
+                        // (La función Exists es propia de SftpClient en Renci.SshNet).
+                        if (!sftpClient.Exists(remoteDirectory))
+                        {
+                            sftpClient.CreateDirectory(remoteDirectory);
+                            Console.WriteLine($"Directorio remoto '{remoteDirectory}' creado exitosamente.");
+                            EC_EscribirLog.EscribirLog($"Directorio remoto '{remoteDirectory}' creado exitosamente.");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Directorio remoto '{remoteDirectory}' ya existe. Se omite creación.");
+                            EC_EscribirLog.EscribirLog($"Directorio remoto '{remoteDirectory}' ya existe. Se omite creación.");
+
+                        }
+                    #endregion
+                    #region Subimos el archivo al directorio remoto de destino
+
+                        string fileName = System.IO.Path.GetFileName(archivo);
+                        string remoteFile = remoteDirectory.TrimEnd('/') + "/" + fileName;
+
+                        // Verificamos si el archivo ya existe en el servidor
+                        if (sftpClient.Exists(remoteFile))
+                        {
+                            EC_EscribirLog.EscribirLog($"El archivo '{remoteFile}' ya existe en el servidor. Se omite subida.");
+                            Console.WriteLine($"El archivo '{remoteFile}' ya existe en el servidor. Se omite subida.");
+                        
+                        }
+                        // Subida de archivo (envolvemos en Task.Run para que sea asíncrono)
+                        EC_EscribirLog.EscribirLog($"Subiendo archivo: {archivo}|{remoteFile}|{fileName}");
+                        Console.WriteLine($"Subiendo archivo: {fileName}");
+
+                        await Task.Run(() =>
+                        {
+                            using (FileStream fs = new FileStream(archivo, FileMode.Open, FileAccess.Read))
+                            {
+                                sftpClient.UploadFile(fs, remoteFile);
+                            }
+                        });
+
+                    #endregion
+
+
+                }
+
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                EC_EscribirLog.EscribirLog($"Error en la subida de archivos remotos: {ex.Message}");
+                return false;
+                throw;
+            }
+
+        }
         #endregion
     }
 }

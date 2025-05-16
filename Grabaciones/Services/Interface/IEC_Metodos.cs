@@ -4,7 +4,8 @@ namespace Grabaciones.Services.Interface
 {
     public interface IEC_Metodos
     {
-        public void CrearDirectorio(string Ruta);
+        public Task<bool> CrearDirectorio(string Ruta);
+
         Task<bool> DownloadFileAsync(string audiomp3,string urlAudio);
         public string ReemplazarTelefonoxVacio(string telefonoxVacio);
         bool ConvertMp3ToGsm(string inputFile, string outputFile);
@@ -18,12 +19,16 @@ namespace Grabaciones.Services.Interface
         Task<string> GetWeekRangeAsync(DateTime startDate, DateTime endDate);
 
         Task<string> ObtenerNombreSemanaUltimoDia(DateTime startDate);
+        public string ObtenerNombreDelMes(System.DateTime startDate);
         Task EnviarDatostablaExcel(GC_ImprimirExcel DatosTablaExcel);
         Task<List<GC_Select_DatosTablaExcel>> ObtenerDatosBD(string nombredelasemana);
         public void EscribirLog(string Message);
-        Task CrearArchivoCsv(List<GC_ImprimirExcel> listImprimirExcel);
+        Task CrearArchivoCsv(List<EC_CSVYanbal> listImprimirCVS);
         Task<List<GC_LeerCsv>> LeerArchivosCsv(string ruta);
-        public string EliminarCaracteresEspeciales(string cadena);
+
+        Task<string> EliminarCaracteresEspeciales(string cadena);
+
+        Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
 
     }
 }

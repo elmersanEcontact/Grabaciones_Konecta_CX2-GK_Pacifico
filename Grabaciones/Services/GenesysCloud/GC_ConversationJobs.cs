@@ -133,7 +133,7 @@ namespace Grabaciones.Services.GenesysCloud
                         }
                     }
                 },
-                
+
                 //new ConversationDetailQueryFilter
                 //{
                 //    Type = ConversationDetailQueryFilter.TypeEnum.And,
@@ -143,7 +143,7 @@ namespace Grabaciones.Services.GenesysCloud
                 //        {
                 //            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
                 //            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
-                //            Value = "9d0fecac-706d-4a4d-9c9b-fd1e89438ec4"
+                //            Value = "a23bbad7-753f-4842-bdbd-24ed691f3847"
                 //        }
                 //    }
                 //},

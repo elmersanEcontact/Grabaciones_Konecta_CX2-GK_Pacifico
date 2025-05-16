@@ -39,7 +39,7 @@ namespace Grabaciones.Controllers
             DateTime FechaInicio = DateTime.ParseExact(_request.startTime, "yyyy-MM-ddTHH:mm:ss", null).AddHours(5);
             DateTime FechaFin = DateTime.ParseExact(_request.endTime, "yyyy-MM-ddTHH:mm:ss", null).AddHours(5);
 
-            DateTime diaActual = DateTime.Today;
+            DateTime diaActual = DateTime.Today.AddHours(5);
             TimeSpan diferencia_dias = diaActual - FechaInicio;
             int vDiferenciaDias = diferencia_dias.Days;
 
@@ -49,18 +49,22 @@ namespace Grabaciones.Controllers
             {
                 return BadRequest(new { codigo = 400, Mensaje = "La fecha Inicio no puede ser mayor a la fecha final" });
             }
-            else if (vDiferenciaDias <= 30)
+            else if (vDiferenciaDias <= 59)
             {
                 try
                 {
+                    EC_EscribirLog.EscribirLog($"Controlador: Entrando en el metodo de Descarga en rango menor a 60 días");
                     Console.WriteLine("Descarga en rango menor a 60 días");
                     _ECmetodos.EscribirLog("La descarga es para el metodo menor a 60 días");
                     vresponseRepositorio = await _descargaDiaria.DescargaDiaria(FechaInicio, FechaFin);
+
+                    EC_EscribirLog.EscribirLog($"Controlador: Descarga ed grabaciones terminada con exito");
                     return Ok(vresponseRepositorio);
 
                 }
                 catch (Exception e)
                 {
+                    EC_EscribirLog.EscribirLog($"Controlador: Error en la descarga de grabaciones| Mensaje: {e.Message}");
                     return BadRequest(new { e.StackTrace, e.Message });
                 }
             }
@@ -68,14 +72,17 @@ namespace Grabaciones.Controllers
             {
                 try
                 {
+                    EC_EscribirLog.EscribirLog($"Controlador: Entrando en el metodo de descarga es para el metodo mayor a 60 días");
                     _ECmetodos.EscribirLog("La descarga es para el metodo mayor a 60 días");
                     Console.WriteLine("Descarga en rango mayor a 60 días");
                     vresponseRepositorio = await _descargaMayor60dias.DescargaMayor60Dias(FechaInicio, FechaFin);
+                    EC_EscribirLog.EscribirLog($"Controlador: Descarga ed grabaciones terminada con exito");
                     return Ok(vresponseRepositorio);
 
                 }
                 catch (Exception e)
                 {
+                    EC_EscribirLog.EscribirLog($"Controlador: Error en la descarga de grabaciones| Mensaje: {e.Message}");
                     return BadRequest(new { e.InnerException, e.Message });
                 }
             }

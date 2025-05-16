@@ -6,58 +6,86 @@ using PureCloudPlatform.Client.V2.Api;
 using PureCloudPlatform.Client.V2.Client;
 using PureCloudPlatform.Client.V2.Model;
 
+using Polly;
+using DocumentFormat.OpenXml.Bibliography;
+using DocumentFormat.OpenXml.Wordprocessing;
+
 namespace Grabaciones.Services.GenesysCloud
 {
     public class SGC_ConversationRecording
     {
-        public static Recording ObtenerDatosGrabacionMP3(string _conversationId, string _recordingId, IConfiguration _config)
+        public static async Task<Recording> ObtenerDatosGrabacionMP3(
+            string _conversationId, 
+            string _recordingId, 
+            IConfiguration _config, 
+            SimpleRateLimiter rateLimiter)
         {            
             var apiInstance = new RecordingApi();
             var conversationId = _conversationId;  // string | Conversation ID
             var recordingId = _recordingId;  // string | Recording ID
             var formatId = _config.GetValue<string>("ConfiguracionAudio:Formato");   // string | The desired media format. Valid values:WAV,WEBM,WAV_ULAW,OGG_VORBIS,OGG_OPUS,MP3,NONE (optional)  (default to WEBM)
             var fileName = _conversationId + "_" + _recordingId;  // string | the name of the downloaded fileName (optional) 
-          //  var mediaFormats = new List<string> { formatId }; // List<string> | All acceptable media formats. Overrides formatId. Valid values:WAV,WEBM,WAV_ULAW,OGG_VORBIS,OGG_OPUS,MP3 (optional) 
             var download = true;  // bool? | requesting a download format of the recording. Valid values:true,false (optional)  (default to false)
 
-            //mediaFormats.Add(formatId);
             Recording result = new Recording();
-            int minIntentos = 0;
-            int maxIntentos = 3;
-            int delayMilliseconds = 5000;
+            int intento = 0;
+            
+            var retryPolicy = Polly.Policy
+                   .Handle<ApiException>()
+                   .Or<HttpRequestException>()
+                   .Or<TimeoutException>()
+                   .Or<Exception>()
+                   .WaitAndRetryAsync(
+                       retryCount: 5,
+                        sleepDurationProvider: retryAttempt => 
+                        {
+                            intento = retryAttempt;
+                            return TimeSpan.FromSeconds(25); // espera constante
+                        },  // siempre espera 10 segundos
+                        onRetryAsync: async (exception, timeSpan, retryCount, context) =>
+                        {
+                            // Aquí se puede registrar el error y el intento actual
+                            string tipoError = exception.GetType().Name;
+                            string mensajeError = exception.Message;
+                            string stackTrace = exception.StackTrace?.Split('\n').FirstOrDefault(); // Línea relevante
 
+                            await EC_EscribirLog.EscribirLogAsync($"[Reintento {retryCount}] Tipo de error: {tipoError}. " +
+                                                 $"|Mensaje: {mensajeError}. Stack: {stackTrace}. " +
+                                                 $"|Esperando {timeSpan.TotalSeconds} segundos antes del siguiente reintento." +
+                                                 $"|ConversationID:{conversationId} - RecordingId:{recordingId}");
+                        });
 
-            try
+            result = await retryPolicy.ExecuteAsync(async () =>
             {
-                //Recording resultado = null;
-                // Gets a specific recording.
-                result = apiInstance.GetConversationRecording(conversationId, recordingId, formatId, null, null, null, download, fileName, null, null);
+                await rateLimiter.WaitAsync();
 
-                //result = resultado is null ? Task.Delay(5000); : resultado;
-                if (result is null)
+                await EC_EscribirLog.EscribirLogAsync(
+                    $"Intento [{intento}] para GetConversationRecordingAsync | ConversationID:{conversationId} - RecordingId:{recordingId}");
+
+                try
                 {
-                    Thread.Sleep(delayMilliseconds);
-                    result = ObtenerDatosGrabacionMP3(_conversationId, _recordingId, _config);
+                    var response = await apiInstance.GetConversationRecordingAsync(
+                        conversationId, recordingId, formatId, null, null, null, download, fileName, null, null);
+
+                    if (response == null)
+                        throw new Exception("Respuesta nula de GetConversationRecordingAsync");
+
+                    return response;
                 }
-            }
-            catch (ApiException ex)
-            {
-                if (ex.ErrorCode == 504)
+                catch (Exception ex)
                 {
+                    string mensaje = ex.Message ?? "";
 
-                    EC_EscribirLog.EscribirLog("Error en Metodo: ObtenerDatosGrabacionMP3 por timeOut" + ex.Message);
-                    Thread.Sleep(delayMilliseconds);
-                    result = ObtenerDatosGrabacionMP3(_conversationId, _recordingId, _config);
+                    if (mensaje.Contains("Rate limit exceeded"))
+                        await Task.Delay(TimeSpan.FromSeconds(30));
+                    else
+                        await Task.Delay(TimeSpan.FromSeconds(20));
 
+                    throw;
                 }
-
-                Thread.Sleep(delayMilliseconds);
-                result = ObtenerDatosGrabacionMP3(_conversationId, _recordingId, _config);
-                EC_EscribirLog.EscribirLog("Error en: Metodo: ObtenerDatosGrabacionMP3" + ex.Message);
-            }
+            });
 
             return result;
-
         }
     }
 }
