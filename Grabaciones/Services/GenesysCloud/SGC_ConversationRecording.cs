@@ -40,7 +40,7 @@ namespace Grabaciones.Services.GenesysCloud
                         sleepDurationProvider: retryAttempt => 
                         {
                             intento = retryAttempt;
-                            return TimeSpan.FromSeconds(25); // espera constante
+                            return TimeSpan.FromSeconds(30); // espera constante
                         },  // siempre espera 10 segundos
                         onRetryAsync: async (exception, timeSpan, retryCount, context) =>
                         {
@@ -68,7 +68,7 @@ namespace Grabaciones.Services.GenesysCloud
                         conversationId, recordingId, formatId, null, null, null, download, fileName, null, null);
 
                     if (response == null)
-                        throw new Exception("Respuesta nula de GetConversationRecordingAsync");
+                        throw new Exception("Respuesta nula de GetConversationRecordingAsync [Se vuelve a intentar]");
 
                     return response;
                 }
@@ -77,9 +77,9 @@ namespace Grabaciones.Services.GenesysCloud
                     string mensaje = ex.Message ?? "";
 
                     if (mensaje.Contains("Rate limit exceeded"))
-                        await Task.Delay(TimeSpan.FromSeconds(30));
+                        await Task.Delay(TimeSpan.FromSeconds(40));
                     else
-                        await Task.Delay(TimeSpan.FromSeconds(20));
+                        await Task.Delay(TimeSpan.FromSeconds(30));
 
                     throw;
                 }
