@@ -20,6 +20,7 @@ using Newtonsoft.Json.Linq;
 using System.Text;
 using DocumentFormat.OpenXml.Bibliography;
 using Newtonsoft.Json;
+using DocumentFormat.OpenXml.Office2010.ExcelAc;
 
 
 
@@ -35,6 +36,7 @@ namespace Grabaciones.Services.Repositorio
         {
             _config = configuration;
             _ecMetodos = ecMetodos;
+            
         }
 
         #region Metodo Descarga diaria
@@ -73,7 +75,10 @@ namespace Grabaciones.Services.Repositorio
             List<EC_Paises> ? paises = _config.GetSection("LConfiguracionPaises:ListadoPaises").Get<List<EC_Paises>>();
             int TotalGrabaciones = _config.GetValue<int>("LConfiguracionPaises:TotalGrabaciones");
             int peticionesConcurrentes = 25;//int.Parse(ConfigurationManager.AppSettings["PeticionesConcurrentes"]);
+            string ? connectionString = _config.GetValue<string>("ConnectionStrings:DefaultConnection");
+            string ? nombreBucket = _config.GetValue<string>("ConfiguracionAWS:bucketName");
 
+            
 
             string DirectorioAudio = $"{xmlRutaPrincipal}\\{anio}\\{NombreDelMes}";
             string _directorioGrabaciones = string.Concat(DirectorioAudio, "-", _nombresemana);
@@ -218,316 +223,7 @@ namespace Grabaciones.Services.Repositorio
 
                     // Esperar a que todas las tareas terminen
                     await Task.WhenAll(tasks);
-
-                /*
-                foreach (AnalyticsConversationWithoutAttributes conversation in conversationDetails)
-                {
-
-
-                        #region variables iniciales
-                            string recordingId = string.Empty;
-                            string conversationId = conversation.ConversationId;
-                            string ? direction = conversation.OriginatingDirection==null ? "": conversation.OriginatingDirection.ToString();
-                            DateTime conversationStartTime = (DateTime)conversation.ConversationStart;
-                            DateTime conversationEndTime = (DateTime)conversation.ConversationEnd;
-                            string userId = string.Empty;
-                            string agentId = string.Empty;
-                            string wrapupcode = string.Empty;
-                            long duration = 0;
-                            long acw = 0 ;
-                            string ani = string.Empty;
-                            string paisName = string.Empty;
-                            string queueName = string.Empty;
-                            string nameDivision = string.Empty;
-                            string ivrSelection = string.Empty;
-                            int holdTime = 0;
-                            string dnis = string.Empty;
-                        #endregion
-
-                        await EC_EscribirLog.EscribirLogAsync("Item: " + conteoConversaciones + " - Conversacion:" + conversation.ConversationId);
-
-                        if(conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Inbound)
-                        {
-                            await EC_EscribirLog.EscribirLogAsync($"Conversacion Outbound - {conversation.ConversationId}");
-                            foreach (var oParticipant in conversation.Participants)
-                            {
-
-                                if (oParticipant.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Acd)
-                                {
-                                    foreach (var _session in oParticipant.Sessions)
-                                    {
-                                    // segments
-                                        foreach (var _segment in _session.Segments)
-                                        {
-                                            if (_segment.QueueId != null)
-                                            {
-                                                // si la cola no es hub_peru-Bolivia
-                                                if (_segment.QueueId != "aa8d9650-8fba-4a06-ad60-e96a99f27233")
-                                                {
-                                                    var pqResultado = PaisCola
-                                                        .SelectMany(grupo => grupo.colas.Select(cola => new
-                                                        {
-                                                            grupo.pais,
-                                                            cola.QueueId,
-                                                            cola.QueueName
-                                                        }))
-
-                                                        .FirstOrDefault(x => x.QueueId == _segment.QueueId);
-                                                    if (pqResultado != null)
-                                                    {
-                                                        queueName = pqResultado.QueueName;
-                                                        paisName = pqResultado.pais;
-                                                        break;
-                                                    }
-                                                }
-                                                // si la cola es HUB_Peru-Bolivia
-                                                else
-                                                {
-
-                                                    string idSkillSegment = _segment.RequestedRoutingSkillIds[0];
-                                                    var resultadoNamePais = PaisCola
-                                                    .FirstOrDefault(p => p.aptitudes != null && p.aptitudes.Any(s => s.skillID == idSkillSegment));
-                                                    paisName = resultadoNamePais.pais;
-                                                    queueName = "HUB_Peru-Bolivia";
-                                                    break;
-
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (oParticipant.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
-                                {
-                                    foreach (var _session in oParticipant.Sessions)
-                                    {
-                                        if (_session.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
-                                        {
-                                            ani = _ecMetodos.ReemplazarTelefonoxVacio(_session.Ani);
-                                            dnis = _ecMetodos.ReemplazarTelefonoxVacio(_session.Dnis);
-                                            userId = ani;
-                                            //agentId = oParticipant.UserId;
-
-                                            //metrics
-                                            foreach(var _metrics in _session.Metrics)
-                                            {
-                                                if (_metrics.Name == "tAcw")
-                                                {
-                                                    acw = acw + _metrics.Value ?? 0; // si es null, asigna 0
-                                                }
-                                                if(_metrics.Name == "tTalk")
-                                                {
-                                                    duration = duration + _metrics.Value ?? 0; // si es null, asigna 0
-                                                }
-                                            }
-
-                                            // segments
-                                            foreach(var _segment in _session.Segments)
-                                            {
-                                                if (_segment.SegmentType == AnalyticsConversationSegment.SegmentTypeEnum.Hold)
-                                                {
-                                                    TimeSpan vholdTime = _segment.SegmentEnd.Value - _segment.SegmentStart.Value;
-                                                    var seconds = + vholdTime.TotalSeconds;
-
-                                                    holdTime = holdTime + (int)seconds;
-                                                }
-                                            }
-
-
-                                        }
-                                    }
-                                }
-                            }
-
-
-
-                        }
-                        if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Outbound)
-                        {
-                            await EC_EscribirLog.EscribirLogAsync($"Conversacion Outbound - {conversation.ConversationId}");
-                        }
-
-                        #region metadata de conversacion según conversationId
-
-                        List<RecordingMetadata> vRecordingMetadata = await SGC_ConversationRecordingmetadata.ObtenerConversationRecordingmetadata(conversation.ConversationId, vFechaInicioIntervalo);
-
-                        string ? vOriginatingDirection =  conversation.OriginatingDirection.ToString();
-                        foreach (var iRecording in vRecordingMetadata)
-                        {
-
-                            //if(iRecording.StartTime.to)
-
-                            XmlGrabaciones xmlGrabaciones = new XmlGrabaciones();
-
-                            recordingId = iRecording.Id;
-
-                            DateTime _startTime = DateTime.Parse(iRecording.StartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
-                            DateTime _endTime = DateTime.Parse(iRecording.EndTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
-                            TimeSpan diferenciaSegundos = _endTime - _startTime;
-                            int nDiferenciaSegundos = diferenciaSegundos.Seconds;
-
-                            Recording DatosMP3 = new Recording();
-                            await EC_EscribirLog.EscribirLogAsync("Se extrae la información de las grabaciones de la conversación: " + iRecording.ConversationId + " y de la grabacion: " + iRecording.Id + " - con una duracion de " + nDiferenciaSegundos.ToString());
-                            DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config);
-
-                            #region datos que ayudan en la generación de archivo xml y descarga ed audio
-
-                                #region se establecen valores de la fecha de grabacion
-                                string _ConversationID = DatosMP3.ConversationId;
-                                string _RecordingId = DatosMP3.Id;
-                                string _SessionId = DatosMP3.SessionId;
-                                DateTime StartTime = DateTime.Parse(DatosMP3.StartTime);
-                                DateTime EndTime = DateTime.Parse(DatosMP3.EndTime);
-                                string _anio = StartTime.ToString("yyyy");
-                                string _mes = StartTime.ToString("MM");
-                                string _dia = StartTime.ToString("dd");
-                                string _Hour = StartTime.ToString("HH");
-                                string _Minute = StartTime.ToString("mm");
-                                string _Seconds = StartTime.ToString("ss");
-                                string _FechaRecording = StartTime.ToString("dd/MM/yyyy");
-                                string _HoraRecording = StartTime.ToString("HH:mm:ss");
-
-                                #endregion
-
-                                #region Datos para Excel
-                                string eFecha = StartTime.ToString("yyyy-MM-dd");
-                                string eAnio = StartTime.ToString("yyyy");
-                                string eMes = StartTime.ToString("MM");
-                                string eDia = StartTime.ToString("dd");
-                                string eHora = StartTime.ToString("HH");
-
-                                #endregion = "";
-
-                                string _directorio = string.Concat(DirectorioAudio);
-                               // string _directorio = string.Concat(DirectorioAudio, "/", _anio, "/", _mes, "/", _dia);
-                                string _NomenclaturaAudioMP3 = "";
-                                string _Audiomp3 = "";
-                                string _NombreAudioExcel = "";
-                                string _urlAudio = "";
-                                string _directorioFTP = "";
-                                string _archivolocal = "";
-
-                                if (!DatosMP3.MediaUris.ContainsKey("S"))
-                                {
-                                    _urlAudio = "NoExisteUri";
-                                }
-                                else if(DatosMP3.MediaUris["S"].MediaUri is null)
-                                {
-                                    _urlAudio = "NoExisteUri";
-                                }
-                                else
-                                {
-                                    _urlAudio = DatosMP3.MediaUris["S"].MediaUri;
-                                }   
-
-
-                                List<User> _users = new List<User>();
-                                _users = DatosMP3.Users;
-                                agentId = _users.Count() > 0 ? _users[0].Username : "NN";
-
-                            #endregion
-
-                            string NombredelAudio = $"{paisName}_{conversationId}_{recordingId}"; //string.Concat(eDia, "-",eMes, "-",eAnio, "_", _RecordingId,"_", eNombreApellidos.Replace(" ", "-").Replace(@"\", "").Replace(@"/", ""), "_",_Telefono);
-                            NombredelAudio = await _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
-                            await EC_EscribirLog.EscribirLogAsync($"Nombre del audio=>{NombredelAudio}");
-                            _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
-
-                            _directorioFTP = string.Concat(xmlRutaFtp, @"-", _nombresemana);
-                            //_directorioFTP = string.Concat(xmlRutaFtp, @"\", _anio, @"\", _mes, @"\", _dia);
-                            _archivolocal = string.Concat(NombredelAudio, ".gsm");
-
-
-                            _Audiomp3 = string.Concat(_directorio, "/", _NomenclaturaAudioMP3);
-
-                            #region Crear el objeto xml
-
-                            xmlGrabaciones.xmlRecordingID = recordingId;
-                            xmlGrabaciones.conversationID = conversationId;
-                            xmlGrabaciones.xmlempresa = xmlEmpresa;
-                            xmlGrabaciones.xmlOrganization = xmlOrganizacion;
-                            //-- campos para yanbal
-                            xmlGrabaciones.IdRecording = recordingId;
-                            xmlGrabaciones.ConversationId = conversationId;
-                            xmlGrabaciones.Direction = direction;
-                            xmlGrabaciones.Duration = duration;
-                            xmlGrabaciones.ConversationStartTime = conversationStartTime.ToString("yyyy-MM-ddTHH:mm:ss");
-                            xmlGrabaciones.ConversationEndTime = conversationEndTime.ToString("yyyy-MM-ddTHH:mm:ss");
-                            xmlGrabaciones.Userid = userId;
-                            xmlGrabaciones.Agentid = agentId;
-                            xmlGrabaciones.WrapUpCode = wrapupcode;
-                            xmlGrabaciones.ACW = acw;
-                            xmlGrabaciones.ANI = ani;
-                            xmlGrabaciones.QueueName = queueName;
-                            xmlGrabaciones.NameDivision = nameDivision;
-                            xmlGrabaciones.IVRSelection = ivrSelection;
-                            xmlGrabaciones.HoldTime = holdTime;
-                            xmlGrabaciones.Dnis = dnis;
-
-                            xmlGrabaciones.xmlRutadeAudio = _directorio;
-                            xmlGrabaciones.xmlRutaCompletaAudioMP3 = _directorio + "/" + _NomenclaturaAudioMP3;
-                            xmlGrabaciones.xmlNombreAudioExcel = _NombreAudioExcel;
-                            xmlGrabaciones.eFecha = eFecha;
-                            xmlGrabaciones.eAnio = eAnio;
-                            xmlGrabaciones.eMes = eMes;
-                            xmlGrabaciones.eDia = eDia;
-                            xmlGrabaciones.eHora = eHora;
-
-                            xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
-                            xmlGrabaciones.xmldirectorioFTP = _directorioFTP.Replace("\\",@"\");
-                            xmlGrabaciones.xmlArchivolocal = _archivolocal;
-
-
-
-                            #region metodo para crear directorio y descargar el audio en MP3
-                                #region Crear directorio
-                                try
-                                {
-                                   await _ecMetodos.CrearDirectorio(xmlGrabaciones.xmlRutadeAudio);
-                                }
-                                catch (Exception ex)
-                                {
-                                    await EC_EscribirLog.EscribirLogAsync($"Error al crearDirectorio: {ex.Message.ToString()}");
-                                    Console.WriteLine("Error: " + ex.Message.ToString());
-                                    throw;
-                                }
-                                #endregion
-
-                                #region Descargar audio
-                                try
-                                {
-                                    xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
-
-                                    if (!xmlGrabaciones.xmlAudioDescargado)
-                                    {
-                                        await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
-                                        continue;
-                                    }
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {xmlGrabaciones.conversationID}| recordingID: {xmlGrabaciones.xmlRecordingID}");
-                                    continue;
-                                }
-                                #endregion
-                            #endregion
-
-                            #endregion
-                            listXmlGrabaciones.Add(xmlGrabaciones);
-
-                        }
-
-                        conteoConversaciones++;
-                        #endregion
-
-
-
-
-
-            } //fin del foreach de todas las conversaciones
-
-             */
-            }
+                }
                 #endregion
 
                 await EC_EscribirLog.EscribirLogAsync($"Fin de la extracción de informacion de grabaciones para los días {vFechaInicioIntervalo} - {vFechaFinIntervalo}");
@@ -540,60 +236,81 @@ namespace Grabaciones.Services.Repositorio
 
             if (listXmlGrabaciones != null && listXmlGrabaciones.Count() > 0)
             {
-            foreach (var iGrabaciones in listXmlGrabaciones)
-            {
-                if (iGrabaciones.xmlUrlGCAudio == "NoExisteUri")
+                foreach (var iGrabaciones in listXmlGrabaciones)
                 {
-                    await EC_EscribirLog.EscribirLogAsync("No existe audio para la grabacion: " + iGrabaciones.xmlRecordingID);
-                }
-                else
-                {
-                        EC_CSVYanbal objExcel = new EC_CSVYanbal();
+                    if (iGrabaciones.xmlUrlGCAudio == "NoExisteUri")
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("No existe audio para la grabacion: " + iGrabaciones.xmlRecordingID);
+                    }
+                    else
+                    {
+                            //EC_CSVYanbal objExcel = new EC_CSVYanbal();
                         
-                        objExcel.IdRecording = iGrabaciones.IdRecording;
-                        objExcel.ConversationId = iGrabaciones.ConversationId;
-                        objExcel.Direction = iGrabaciones.Direction;
-                        objExcel.Duration = iGrabaciones.Duration;
-                        objExcel.ConversationStartTime = iGrabaciones.ConversationStartTime;
-                        objExcel.ConversationEndTime = iGrabaciones.ConversationEndTime;
-                        objExcel.Userid = iGrabaciones.Userid;
-                        objExcel.Agentid = iGrabaciones.Agentid;
-                        objExcel.WrapUpCode = iGrabaciones.WrapUpCode;
-                        objExcel.ACW = iGrabaciones.ACW;
-                        objExcel.ANI= iGrabaciones.ANI;
-                        objExcel.QueueName = iGrabaciones.QueueName;
-                        objExcel.NameDivision = iGrabaciones.NameDivision;
-                        objExcel.IVRSelection = iGrabaciones.IVRSelection;
-                        objExcel.HoldTime = iGrabaciones.HoldTime;
-                        objExcel.Dnis = iGrabaciones.Dnis;
-                        objExcel.DirectorioCSV = DirectorioAudio;
+                            //objExcel.IdRecording = iGrabaciones.IdRecording;
+                            //objExcel.ConversationId = iGrabaciones.ConversationId;
+                            //objExcel.Direction = iGrabaciones.Direction;
+                            //objExcel.Duration = iGrabaciones.Duration;
+                            //objExcel.ConversationStartTime = iGrabaciones.ConversationStartTime;
+                            //objExcel.ConversationEndTime = iGrabaciones.ConversationEndTime;
+                            //objExcel.Userid = iGrabaciones.Userid;
+                            //objExcel.Agentid = iGrabaciones.Agentid;
+                            //objExcel.WrapUpCode = iGrabaciones.WrapUpCode;
+                            //objExcel.ACW = iGrabaciones.ACW;
+                            //objExcel.ANI= iGrabaciones.ANI;
+                            //objExcel.QueueName = iGrabaciones.QueueName;
+                            //objExcel.NameDivision = iGrabaciones.NameDivision;
+                            //objExcel.IVRSelection = iGrabaciones.IVRSelection;
+                            //objExcel.HoldTime = iGrabaciones.HoldTime;
+                            //objExcel.Dnis = iGrabaciones.Dnis;
+                            //objExcel.DirectorioCSV = DirectorioAudio;
 
-                        listImprimirCSV.Add(objExcel);
+                            //listImprimirCSV.Add(objExcel);
 
-                      
+                            listImprimirCSV.Add(new EC_CSVYanbal {
+                                IdRecording= iGrabaciones.IdRecording,
+                                ConversationId= iGrabaciones.ConversationId,
+                                Direction = iGrabaciones.Direction,
+                                Duration = iGrabaciones.Duration,
+                                ConversationStartTime = iGrabaciones.ConversationStartTime,
+                                ConversationEndTime = iGrabaciones.ConversationEndTime,
+                                Userid = iGrabaciones.Userid,
+                                Agentid = iGrabaciones.Agentid,
+                                WrapUpCode = iGrabaciones.WrapUpCode,
+                                ACW = iGrabaciones.ACW,
+                                ANI = iGrabaciones.ANI,
+                                QueueName = iGrabaciones.QueueName,
+                                NameDivision = iGrabaciones.NameDivision,
+                                IVRSelection = iGrabaciones.IVRSelection,
+                                HoldTime = iGrabaciones.HoldTime,
+                                Dnis = iGrabaciones.Dnis,
+                                DirectorioCSV = DirectorioAudio,
+                                rutacompletaAudio = iGrabaciones.xmlRutaCompletaAudioMP3
+                            });
 
-                        #region Subir archivo a FTP
-                        //if (respuestaAudio)
-                        //{
-                        //    try
-                        //    {
-                               
-                              //  var result = _ecMetodos.UploadFTPAudios(iGrabaciones.xmldirectorioFTP, iGrabaciones.xmlRutaCompletaAudioGSM, iGrabaciones.xmlArchivolocal);
 
-                        //    }
-                        //    catch (Exception ex)
-                        //    {
-                        //        await EC_EscribirLog.EscribirLogAsync($"Error en UploadFTPAudios: {ex.Message.ToString()}");
-                        //        throw;
-                        //    }
-                        //}
-                        #endregion
 
-                        #region subir a repositorio de amazon S3
+                            #region Subir archivo a FTP
+                            //if (respuestaAudio)
+                            //{
+                            //    try
+                            //    {
+
+                            //  var result = _ecMetodos.UploadFTPAudios(iGrabaciones.xmldirectorioFTP, iGrabaciones.xmlRutaCompletaAudioGSM, iGrabaciones.xmlArchivolocal);
+
+                            //    }
+                            //    catch (Exception ex)
+                            //    {
+                            //        await EC_EscribirLog.EscribirLogAsync($"Error en UploadFTPAudios: {ex.Message.ToString()}");
+                            //        throw;
+                            //    }
+                            //}
+                            #endregion
+
+                            #region subir a repositorio de amazon S3
                             //if (respuestaAudio) {
                             //    try
                             //    {
-                           //     var resultS3 = _ecMetodos.SubirArchivosSFTAmazon(iGrabaciones.xmlRutaCompletaAudioGSM, _nombresemana, iGrabaciones.eAnio);
+                            //     var resultS3 = _ecMetodos.SubirArchivosSFTAmazon(iGrabaciones.xmlRutaCompletaAudioGSM, _nombresemana, iGrabaciones.eAnio);
                             //    }
                             //    catch (Exception ex)
                             //    {
@@ -601,19 +318,15 @@ namespace Grabaciones.Services.Repositorio
                             //        throw;
                             //    }
                             //}
-                        #endregion
+                            #endregion
 
+                        }
                 }
-            }
 
                 #region crear archivo csv por día
                 try
                 {
                     var respuesta = _ecMetodos.CrearArchivoCsv(listImprimirCSV);
-                    
-                  //  var respuestaS3 = _ecMetodos.SubirArchivosSFTAmazon($"{listImprimirExcel[0].archivoCsv}.csv", _nombresemana, listImprimirExcel[0].anio);
-                   
-
                 }
                 catch (Exception ex)
                 {
@@ -621,11 +334,29 @@ namespace Grabaciones.Services.Repositorio
                     throw;
                 }
                 #endregion
+
+                #region Insertar metadata en la base de datos
+                string respuestaSQL = await _ecMetodos.GuardarMetadataEnBaseDatos(listImprimirCSV, connectionString);
+                string respuestaOkErrorSQl = respuestaSQL.Split('|')[0];
+
+                if (respuestaOkErrorSQl == "Ok")
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Se insertaron correctamente los registros en la base de datos");
+                }
+                else
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Error al insertar los registros en la base de datos: {respuestaSQL}");
+                }
+                #endregion
+
+                #region Enviar las grabaciones a Bucket AWS
+                await EC_EscribirLog.EscribirLogAsync($"Inicio de proceso de envio de grabaciones a Bucket");
+                string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, DirectorioAudio);
+                #endregion
             }
             #endregion
 
             #region solo ejecutar cuando es el ultimo día de la semana el día es domingo
-
             if (ultimodiadelasemana)
             {
 
@@ -672,7 +403,6 @@ namespace Grabaciones.Services.Repositorio
 
         }
         #endregion
-
 
         #region getRecordingStatus
         // Plot conversationId and recordingId to request for batchdownload Recordings
@@ -930,11 +660,6 @@ namespace Grabaciones.Services.Repositorio
                     await EC_EscribirLog.EscribirLogAsync($"Nombre del audio=>{NombredelAudio}");
                     _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
 
-                     //_directorioFTP = string.Concat(xmlRutaFtp, @"-", _nombresemana);
-                    //_directorioFTP = string.Concat(xmlRutaFtp, @"\", _anio, @"\", _mes, @"\", _dia);
-                    _archivolocal = string.Concat(NombredelAudio, ".gsm");
-
-
                     _Audiomp3 = string.Concat(_directorio, "/", _NomenclaturaAudioMP3);
 
                     #region Crear el objeto xml
@@ -1020,8 +745,8 @@ namespace Grabaciones.Services.Repositorio
                     listXmlGrabaciones.Add(xmlGrabaciones);
                 }
 
-                #endregion
-
+                #endregion 
+                 
             } //fin del foreach de todas las conversaciones
         }
         #endregion

@@ -499,9 +499,6 @@ namespace Grabaciones.Services.Repositorio
             }
             #endregion
 
-
-
-
             #region Descarga de las grabaciones
             EC_EscribirLog.EscribirLog($"Se descargaran un total de {listXmlGrabaciones.Count()} grabaciones en MP3");
 
@@ -624,8 +621,6 @@ namespace Grabaciones.Services.Repositorio
             }
             #endregion
 
-
-
             #region solo ejecutar cuando es el ultimo día de la semana el día es domingo
 
             if (ultimodiadelasemana)
@@ -671,25 +666,6 @@ namespace Grabaciones.Services.Repositorio
             #endregion 
 
             return new ResponseRepositorio { statusCode = 200, message = "Ok" };
-
-            #region Enviar datos a la base de datos
-
-            //foreach (GC_ImprimirExcel ilistImprimirExcel in listImprimirExcel)
-            //{
-            //    var _Jobj = ilistImprimirExcel.ToString();
-
-            //    try
-            //    {
-            //        var respuesta = _ecMetodos.EnviarDatostablaExcel(ilistImprimirExcel);
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        Console.WriteLine(ex.Message.ToString());
-            //        throw;
-            //    }
-
-            //}
-            #endregion
         }
         #endregion
 

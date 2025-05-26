@@ -30,5 +30,9 @@ namespace Grabaciones.Services.Interface
 
         Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
 
+        Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString);
+
+        Task<string> EnviarGrabaciones_a_Bucket(string nombreBucket, List<EC_CSVYanbal> listImprimirCSV, int anio, string nombredelMes, string rutaLocal);
+
     }
 }

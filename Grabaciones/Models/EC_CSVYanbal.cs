@@ -19,6 +19,7 @@
         public long ?HoldTime { get; set; }
         public string ?Dnis { get; set; }
         public string? DirectorioCSV { get; set; }
+        public string? rutacompletaAudio{ get; set; }
 
     }
 }

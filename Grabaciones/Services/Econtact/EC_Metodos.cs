@@ -28,17 +28,29 @@ using Renci.SshNet;
 using Renci.SshNet.Sftp;
 using System.Threading.Tasks;
 
+using System.Data;
+using System.Data.SqlClient;
+using Dapper;
+using Microsoft.Win32;
+using DocumentFormat.OpenXml.Office2016.Word.Symex;
+
+using Amazon.S3;
+using Amazon.S3.Transfer;
+
+
 namespace Grabaciones.Services.Econtact
 {
     public class EC_Metodos: IEC_Metodos
     {
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
+        private readonly IAmazonS3 _s3Client;
 
-        public EC_Metodos(IConfiguration config, HttpClient HttpClient)
+        public EC_Metodos(IConfiguration config, HttpClient HttpClient, IAmazonS3 s3Client)
         {
             _config = config;
             _httpClient = HttpClient;
+            _s3Client = s3Client;
         }
 
         #region Crear Directorio
@@ -1110,6 +1122,7 @@ namespace Grabaciones.Services.Econtact
 
                         }
                     #endregion
+
                     #region Subimos el archivo al directorio remoto de destino
 
                         string fileName = System.IO.Path.GetFileName(archivo);
@@ -1150,6 +1163,215 @@ namespace Grabaciones.Services.Econtact
             }
 
         }
+        #endregion
+
+        #region Metodo para guardar la información de metadata en Base de datos
+        public async Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString)
+        {
+            try
+            {
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                using var bulkCopy = new SqlBulkCopy(connection)
+                {
+                    DestinationTableName = "dbo.TB_Grabaciones", // nombre exacto de la tabla
+                    BatchSize = 1000,
+                    BulkCopyTimeout = 0 // sin límite de tiempo
+                };
+
+                // Mapear columnas si los nombres difieren entre el modelo y la tabla
+                bulkCopy.ColumnMappings.Add("cIdRecording", "cIdRecording");
+                bulkCopy.ColumnMappings.Add("cConversationId", "cConversationId");
+                bulkCopy.ColumnMappings.Add("cDirection", "cDirection");
+                bulkCopy.ColumnMappings.Add("nDuration", "nDuration");
+                bulkCopy.ColumnMappings.Add("dConversationStartTime", "dConversationStartTime");
+                bulkCopy.ColumnMappings.Add("dConversationEndTime", "dConversationEndTime");
+                bulkCopy.ColumnMappings.Add("cUserId", "cUserId");
+                bulkCopy.ColumnMappings.Add("cAgentId", "cAgentId");
+                bulkCopy.ColumnMappings.Add("cWrapupcode", "cWrapupcode");
+                bulkCopy.ColumnMappings.Add("nAcw", "nAcw");
+                bulkCopy.ColumnMappings.Add("cAni", "cAni");
+                bulkCopy.ColumnMappings.Add("cQueueName", "cQueueName");
+                bulkCopy.ColumnMappings.Add("cNameDivision", "cNameDivision");
+                bulkCopy.ColumnMappings.Add("cIVRSelection", "cIVRSelection");
+                bulkCopy.ColumnMappings.Add("nHoldTime", "nHoldTime");
+                bulkCopy.ColumnMappings.Add("cDnis", "cDnis");
+                bulkCopy.ColumnMappings.Add("cDirectorioCSV", "cDirectorioCSV");
+
+                // Convertir la lista a DataTable
+                var dataTable = ConvertToDataTable(listImprimirCSV);
+
+                await bulkCopy.WriteToServerAsync(dataTable);
+
+                await EC_EscribirLog.EscribirLogAsync($"OK|Inserción de metadata en base de datos de manera exitosa");
+                return $"OK|Inserción de metadata en base de datos de manera exitosa";
+            }
+            catch(SqlException sqlEx)
+            {
+                string mensajeError = $"ErrorSQL|Error al insertar metadata en base de datos|Codigo:{sqlEx.ErrorCode}| Mensaje: {sqlEx.Message}";
+                await EC_EscribirLog.EscribirLogAsync(mensajeError);
+                return mensajeError;
+            }
+            catch (Exception ex)
+            {
+                string mensajeError = $"ErrorSQL|Error al insertar metadata en base de datos| Mensaje: {ex.Message}";
+                return mensajeError;
+            }
+        }
+        #endregion
+
+        #region Convertir lista de metadata a DataTable
+        private static System.Data.DataTable ConvertToDataTable(IEnumerable<EC_CSVYanbal> lista)
+        {
+            var table = new System.Data.DataTable();
+            table.Columns.Add("cIdRecording", typeof(string));
+            table.Columns.Add("cConversationId", typeof(string));
+            table.Columns.Add("cDirection", typeof(string));
+            table.Columns.Add("nDuration", typeof(int));
+            table.Columns.Add("dConversationStartTime", typeof(string));
+            table.Columns.Add("dConversationEndTime", typeof(string));
+            table.Columns.Add("cUserId", typeof(string));
+            table.Columns.Add("cAgentId", typeof(string));
+            table.Columns.Add("cWrapupcode", typeof(string));
+            table.Columns.Add("nAcw", typeof(int));
+            table.Columns.Add("cAni", typeof(string));
+            table.Columns.Add("cQueueName", typeof(string));
+            table.Columns.Add("cNameDivision", typeof(string));
+            table.Columns.Add("cIVRSelection", typeof(string));
+            table.Columns.Add("nHoldTime", typeof(int));
+            table.Columns.Add("cDnis", typeof(string));
+            table.Columns.Add("cDirectorioCSV", typeof(string));
+            table.Columns.Add("DirectorioCSV", typeof(string));
+
+            foreach (var item in lista)
+            {
+                table.Rows.Add(
+                    item.IdRecording ?? (object)DBNull.Value,
+                    item.ConversationId ?? (object)DBNull.Value,
+                    item.Direction ?? (object)DBNull.Value,
+                    item.Duration ?? (object)DBNull.Value,
+                    item.ConversationStartTime ?? (object)DBNull.Value,
+                    item.ConversationEndTime ?? (object)DBNull.Value,
+                    item.Userid ?? (object)DBNull.Value,
+                    item.Agentid ?? (object)DBNull.Value,
+                    item.WrapUpCode ?? (object)DBNull.Value,
+                    item.ACW ?? (object)DBNull.Value,
+                    item.ANI ?? (object)DBNull.Value,
+                    item.QueueName ?? (object)DBNull.Value,
+                    item.NameDivision ?? (object)DBNull.Value,
+                    item.IVRSelection ?? (object)DBNull.Value,
+                    item.HoldTime ?? (object)DBNull.Value,
+                    item.Dnis ?? (object)DBNull.Value,
+                    item.DirectorioCSV ?? (object)DBNull.Value
+                );
+            }
+
+            return table;
+        }
+        #endregion
+
+        #region Enviar las grabaciones al Bucket AWS
+        public async Task<string> EnviarGrabaciones_a_Bucket(string nombreBucket, List<EC_CSVYanbal> listImprimirCSV, int anio, string nombredelMes, string rutaLocal)
+        {
+            var resultado = new StringBuilder();
+
+            if (string.IsNullOrWhiteSpace(nombreBucket))
+                return "Error|El nombre del bucket es inválido.";
+
+            if (listImprimirCSV == null || listImprimirCSV.Count == 0)
+                return "Error|La lista de grabaciones está vacía.";
+
+            if (string.IsNullOrWhiteSpace(nombredelMes))
+                return "Error|El nombre del mes no puede estar vacío.";
+
+            string prefix = $"{anio}/{nombredelMes.Trim()}/";
+            var transferUtility = new TransferUtility(_s3Client);
+
+            try
+            {
+                string[] archivos = Directory.GetFiles(rutaLocal, "*.*", SearchOption.TopDirectoryOnly);
+
+                if (archivos.Length == 0)
+                    return $"Advertencia|No se encontraron archivos en el directorio {rutaLocal}.";
+
+                // Obtener carpetas para generar el "prefix" lógico en el bucket (por ejemplo 2025/MAYO)
+                var directorioInfo = new DirectoryInfo(rutaLocal);
+                var nombreMes = directorioInfo.Name;
+                var nombreAnio = directorioInfo.Parent?.Name;
+               // string prefix = $"{nombreAnio}/{nombreMes}/"; // ejemplo: 2025/MAYO/
+
+                foreach (var archivo in archivos)
+                {
+                    try
+                    {
+                        string nombreArchivo = System.IO.Path.GetFileName(archivo);
+                        string key = prefix + nombreArchivo;
+
+                        await transferUtility.UploadAsync(archivo, nombreBucket, key);
+
+                        resultado.AppendLine($"OK|Archivo subido: {key}");
+                    }
+                    catch (AmazonS3Exception s3Ex)
+                    {
+                        string error = $"Error S3|{s3Ex.Message} (Archivo: {archivo})";
+                        await EC_EscribirLog.EscribirLogAsync(error);
+                        resultado.AppendLine(error);
+                    }
+                    catch (Exception ex)
+                    {
+                        string error = $"Error General|{ex.Message} (Archivo: {archivo})";
+                        await EC_EscribirLog.EscribirLogAsync(error);
+                        resultado.AppendLine(error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                string error = $"Error Crítico|{ex.Message}";
+                await EC_EscribirLog.EscribirLogAsync(error);
+                return error;
+            }
+
+            /*
+            foreach (var item in listImprimirCSV)
+            {
+                try
+                {
+                    string nombreArchivo = $"{item.ConversationId}_{item.IdRecording}.mp3";
+                    string rutaArchivo = item.rutacompletaAudio;
+
+                    if (string.IsNullOrWhiteSpace(rutaArchivo) || !File.Exists(rutaArchivo))
+                    {
+                        string mensajeError = $"Advertencia|Archivo no encontrado: {rutaArchivo}";
+                        await EC_EscribirLog.EscribirLogAsync(mensajeError);
+                        resultado.AppendLine(mensajeError);
+                        continue;
+                    }
+                    string envioBucket = $"Subiendo archivo: {rutaArchivo} a {nombreBucket}/{prefix + nombreArchivo}";
+                    await transferUtility.UploadAsync(rutaArchivo, nombreBucket, prefix + nombreArchivo);
+
+                    string mensajeOk = $"OK|Archivo subido: {prefix + nombreArchivo}";
+                    resultado.AppendLine(mensajeOk);
+                }
+                catch (AmazonS3Exception s3Ex)
+                {
+                    string mensajeError = $"Error S3|{s3Ex.Message}|Bucket: {nombreBucket}| (Archivo: {item.rutacompletaAudio})";
+                    await EC_EscribirLog.EscribirLogAsync(mensajeError);
+                    resultado.AppendLine(mensajeError);
+                }
+                catch (Exception ex)
+                {
+                    string mensajeError = $"Error General|{ex.Message} (Archivo: {item.rutacompletaAudio})";
+                    await EC_EscribirLog.EscribirLogAsync(mensajeError);
+                    resultado.AppendLine(mensajeError);
+                }
+            }
+            */
+
+            return resultado.ToString();
+        }
+
         #endregion
     }
 }
