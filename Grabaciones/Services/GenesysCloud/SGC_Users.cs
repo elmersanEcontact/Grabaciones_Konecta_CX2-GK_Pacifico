@@ -9,12 +9,11 @@ namespace Grabaciones.Services.GenesysCloud
 {
     public class SGC_Users
     {
-        public static List<GC_Users> ObtenerUsuarios()
+        #region Obtener todos los usuarios de Genesys Cloud
+        public static async Task<List<GC_Users>> ObtenerUsuarios()
         {
 
             List<GC_Users> queueUser = new List<GC_Users>();
-
-
 
 
             var apiInstance = new UsersApi();
@@ -36,8 +35,8 @@ namespace Grabaciones.Services.GenesysCloud
                 while (flag)
                 {
                     // Get list of queues.
-                    UserEntityListing resultUsers = apiInstance.GetUsers(userPagesize, userpageNumber, null, null, sortOrder, null, null, state);
-                    Debug.WriteLine(resultUsers);
+                    UserEntityListing resultUsers = await apiInstance.GetUsersAsync(userPagesize, userpageNumber, null, null, sortOrder, null, null, state);
+
 
                     foreach (var result in resultUsers.Entities)
                     {
@@ -72,5 +71,8 @@ namespace Grabaciones.Services.GenesysCloud
 
             return queueUser;
         }
+        #endregion
+
+
     }
 }

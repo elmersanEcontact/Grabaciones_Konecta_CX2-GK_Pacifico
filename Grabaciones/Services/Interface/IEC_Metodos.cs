@@ -1,4 +1,5 @@
 ﻿using Grabaciones.Models;
+using PureCloudPlatform.Client.V2.Model;
 
 namespace Grabaciones.Services.Interface
 {
@@ -34,5 +35,12 @@ namespace Grabaciones.Services.Interface
 
         Task<string> EnviarGrabaciones_a_Bucket(string nombreBucket, List<EC_CSVYanbal> listImprimirCSV, int anio, string nombredelMes, string rutaLocal);
 
+        Task<string> GetDivisionName(List<GC_Division> ListDivisions, string divisionID);
+
+        Task<string> GetCampaignName(AnalyticsConversationWithoutAttributes conversation, List<EC_Campaign> listCampaign);
+
+        Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation);
+
+        Task<string> GetDNIAsesor(CallConversation callConversation);
     }
 }

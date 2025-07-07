@@ -36,6 +36,7 @@ using DocumentFormat.OpenXml.Office2016.Word.Symex;
 
 using Amazon.S3;
 using Amazon.S3.Transfer;
+using System.Runtime.CompilerServices;
 
 
 namespace Grabaciones.Services.Econtact
@@ -139,9 +140,10 @@ namespace Grabaciones.Services.Econtact
 		#region Validar el telefono y reemplazar caracteres por vacio
 		public string ReemplazarTelefonoxVacio(string telefonoxVacio)
 		{
-			string vTelefono = telefonoxVacio.Replace("tel:", "")
-                                             .Replace("tel:+", "")
-                                             .Replace("+", "");
+            int largNumero = telefonoxVacio.Length;
+            int inicio = telefonoxVacio.Length - 9;
+            string vTelefono = telefonoxVacio.Substring(inicio, 9);
+
             return vTelefono;
 		}
         //405651976494542
@@ -1372,6 +1374,125 @@ namespace Grabaciones.Services.Econtact
             return resultado.ToString();
         }
 
+        #endregion
+
+        #region Obtener nombre de division
+        public async Task<string> GetDivisionName(List<GC_Division> ListDivisions, string divisionID)
+        {
+            if (ListDivisions == null || ListDivisions.Count == 0)
+            {
+                return await Task.FromResult("No hay divisiones disponibles.");
+            }
+
+            var division = ListDivisions.FirstOrDefault(d => d.id == divisionID);
+            if (division != null)
+            {
+                return await Task.FromResult(division.name?? "SinDivision");
+            }
+            else
+            {
+                return await Task.FromResult("División no encontrada.");
+            }
+        }
+        #endregion
+
+        #region Obtener el nombre de la campaña
+        public async Task<string> GetCampaignName(AnalyticsConversationWithoutAttributes conversation,  List<EC_Campaign> listCampaign)
+        {
+            string nombreDeCampania = string.Empty;
+            string campaingId = string.Empty;
+
+            try
+            {
+                // Validar conversación
+                if (conversation?.Participants == null || !conversation.Participants.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontraron participantes en la conversación");
+                }
+
+                // Validar lista de campañas
+                if (listCampaign == null || !listCampaign.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync("Lista de campañas vacía o nula");
+                }
+
+                // Obtener ID de campaña
+                campaingId = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Customer)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.OutboundCampaignId))
+                    .Select(s => s.OutboundCampaignId)
+                    .FirstOrDefault() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(campaingId))
+                {
+                   
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontró ID de campaña en participante customer ");
+                   
+                }
+
+                // Buscar nombre de campaña
+                nombreDeCampania = listCampaign
+                    .Where(c => !string.IsNullOrWhiteSpace(c.IdCampaign))
+                    .FirstOrDefault(c => string.Equals(c.IdCampaign, campaingId, StringComparison.OrdinalIgnoreCase))
+                    ?.NameCampaign ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(nombreDeCampania))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Campaña con ID '{campaingId}' no encontrada en la lista");
+                    
+                }
+
+            }
+            catch (Exception ex)
+            {
+               string ErrorMessage = $"Error al obtener información de la campaña: {ex.Message}";
+                await EC_EscribirLog.EscribirLogAsync(ErrorMessage);
+            }
+
+            if (nombreDeCampania is null || nombreDeCampania == "")
+            {
+                nombreDeCampania = "SinCampaña";
+            }
+            return nombreDeCampania;
+
+        }
+        #endregion
+
+        #region Obtener numeros de telefeno
+        public async Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation)
+        {
+            if (conversation?.Participants == null || !conversation.Participants.Any())
+                return await Task.FromResult(string.Empty);
+
+            var numeroTelefono = conversation.Participants
+                .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
+                .Where(p => p.Sessions?.Any() == true)
+                .SelectMany(p => p.Sessions)
+                .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
+                .Where(s => !string.IsNullOrWhiteSpace(s.Dnis))
+                .Select(s => ReemplazarTelefonoxVacio(s.Dnis))
+                .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+
+            return await Task.FromResult(numeroTelefono ?? string.Empty);
+        }
+        #endregion
+
+        #region Obtener numero de dni del asesor
+        public async Task<string> GetDNIAsesor(CallConversation callConversation)
+        {
+            if (callConversation?.Participants == null || !callConversation.Participants.Any())
+                return await Task.FromResult("NNNNNNNN");
+
+            var dniAsesor = callConversation.Participants
+                                                .Where(p => p.Attributes?.Any() == true)
+                                                .SelectMany(p => p.Attributes)
+                                                .Where(a => a.Key.Equals("wsAgenteDni", StringComparison.OrdinalIgnoreCase))
+                                                .FirstOrDefault().Value?.ToString() ?? "NNNNNNNN";
+
+            return await Task.FromResult(dniAsesor ?? "NNNNNNNN");
+        }
         #endregion
     }
 }

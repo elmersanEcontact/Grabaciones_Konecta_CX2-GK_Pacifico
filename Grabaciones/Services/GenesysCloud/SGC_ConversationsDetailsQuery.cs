@@ -347,7 +347,7 @@ namespace Grabaciones.Services.GenesysCloud
         #endregion
 
         #region Obtener conversaciones
-        public static List<AnalyticsConversationWithoutAttributes> ObtenerConversaciones(string rangoFechas, string ValueSegmentQuery, IConfiguration config)
+        public static async Task<List<AnalyticsConversationWithoutAttributes>> ObtenerConversaciones(string rangoFechas, string ValueSegmentQuery, IConfiguration config)
         {
             #region Configurar filtros
             List<SegmentDetailQueryFilter> oSegmentDetailQuery = new List<SegmentDetailQueryFilter>();
@@ -445,77 +445,31 @@ namespace Grabaciones.Services.GenesysCloud
             #region Filtros conversationDetailQuery
             oConversationDetailQueryFilter = new List<ConversationDetailQueryFilter>()
             {
+                 new ConversationDetailQueryFilter
+                 {
+                     Type = ConversationDetailQueryFilter.TypeEnum.Or,
+                     Predicates = new List<ConversationDetailQueryPredicate>()
+                     {
+                         new ConversationDetailQueryPredicate()
+                         {
+                             Dimension = ConversationDetailQueryPredicate.DimensionEnum.Originatingdirection,
+                             Value = "outbound"
+                         }
+                     }
+                 },
                 new ConversationDetailQueryFilter
                 {
-                    Type = ConversationDetailQueryFilter.TypeEnum.Or,
+                    Type = ConversationDetailQueryFilter.TypeEnum.And,
                     Predicates = new List<ConversationDetailQueryPredicate>()
                     {
                         new ConversationDetailQueryPredicate()
                         {
-                            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Originatingdirection,
-                            Value = "inbound"
+                            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
+                            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
+                            Value = "3b2113bf-07f8-4c4e-826d-f785b02a31c4"
                         }
                     }
-                },
-
-                
-
-                //new ConversationDetailQueryFilter
-                //{
-                //    Type = ConversationDetailQueryFilter.TypeEnum.Or,
-                //    Predicates = new List<ConversationDetailQueryPredicate>()
-                //    {
-                //        new ConversationDetailQueryPredicate()
-                //        {
-                //            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Divisionid,
-                //            Value = vDivisionId
-                //        }
-                //    }
-                //},
-                //new ConversationDetailQueryFilter
-                //{
-                //    Type = ConversationDetailQueryFilter.TypeEnum.And,
-                //    Predicates= new List<ConversationDetailQueryPredicate>()
-                //    {
-                //        new ConversationDetailQueryPredicate()
-                //        {
-                //            Metric = ConversationDetailQueryPredicate.MetricEnum.Thandle,
-                //            Operator = ConversationDetailQueryPredicate.OperatorEnum.Exists                    
-                //        },
-                //        new ConversationDetailQueryPredicate()
-                //        {
-                //            Metric = ConversationDetailQueryPredicate.MetricEnum.Ttalk,
-                //            Operator = ConversationDetailQueryPredicate.OperatorEnum.Exists
-                //        }
-                //    }
-                //}
-                ////,
-                ////new ConversationDetailQueryFilter
-                ////{
-                ////    Type = ConversationDetailQueryFilter.TypeEnum.And,
-                ////    Predicates = new List<ConversationDetailQueryPredicate>()
-                ////    {
-                ////        new ConversationDetailQueryPredicate()
-                ////        {
-                ////            Type = ConversationDetailQueryPredicate.TypeEnum.Metric,
-                ////            Operator = ConversationDetailQueryPredicate.OperatorEnum.Exists,
-                ////            Metric = ConversationDetailQueryPredicate.MetricEnum.Tanswered
-                ////        }
-                ////    }
-                ////}
-                //new ConversationDetailQueryFilter
-                //{
-                //    Type = ConversationDetailQueryFilter.TypeEnum.And,
-                //    Predicates = new List<ConversationDetailQueryPredicate>()
-                //    {
-                //        new ConversationDetailQueryPredicate()
-                //        {
-                //            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
-                //            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
-                //            Value = "6871f525-a384-4212-8ed9-49c1d6ddcadf"
-                //        }
-                //    }
-                //}
+                }
 
             };
             #endregion
@@ -529,18 +483,20 @@ namespace Grabaciones.Services.GenesysCloud
             bool flag = true;
             int tConversaciones =0; //total de conversaciones extraidas
 
-            var objBody = body.ToJson();
-
-            Console.WriteLine(objBody);
+          
 
             while (flag)
             {
                 PagingSpec Paginacion = new PagingSpec(iPageSize, iPageIndex);
                 body.Paging = Paginacion;
 
+                var objBody = body.ToJson();
+
+                Console.WriteLine(objBody);
+
                 try
                 {
-                    vconversationDetails = conversationsApi.PostAnalyticsConversationsDetailsQuery(body);
+                    vconversationDetails = await conversationsApi.PostAnalyticsConversationsDetailsQueryAsync(body);
 
                     if(vconversationDetails.TotalHits > 0 ) { 
                         //conversaciones.Add(vconversationDetails.Conversations.ToList<>);

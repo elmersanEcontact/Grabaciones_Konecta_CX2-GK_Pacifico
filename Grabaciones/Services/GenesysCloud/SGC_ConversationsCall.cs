@@ -6,13 +6,13 @@ namespace Grabaciones.Services.GenesysCloud
 {
     public class SGC_ConversationsCall
     {
-        public static CallConversation ObtenerCallConversation(string conversationID)
+        public static async Task<CallConversation> ObtenerCallConversation(string conversationID)
         {
             var conversationsApi = new ConversationsApi();
             CallConversation resultConversation = new CallConversation();
             try
             {
-                resultConversation = conversationsApi.GetConversationsCall(conversationID);
+                resultConversation = await conversationsApi.GetConversationsCallAsync(conversationID);
             }
             catch (Exception ex )
             {

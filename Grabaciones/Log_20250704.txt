@@ -1,0 +1,11 @@
+******************      Log   20250704       ******************
+4/07/2025 09:36:59 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 09:42:24 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 09:44:42 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 10:15:45 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 10:28:37 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 10:30:34 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 10:33:11 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 10:47:30 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 11:39:57 ==>  La descarga es para el metodo menor a 60 días
+4/07/2025 11:40:51 ==>  La descarga es para el metodo menor a 60 días

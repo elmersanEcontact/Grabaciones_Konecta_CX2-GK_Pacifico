@@ -41,7 +41,8 @@ namespace Grabaciones.Services.GenesysCloud
                     flag= false;
                 }
             }
-            return divisionList;
+
+            return divisionList.Where(d=>d.name.Contains("PACIFICO")).ToList();
         }
     }
 }

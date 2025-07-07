@@ -82,13 +82,12 @@ namespace Grabaciones.Services.Repositorio
             #endregion
 
             #region Obtener Divisiones -- validar cuando falle el método
-            List<GC_Division> ListDivisions = new List<GC_Division>();
-            ListDivisions = sGC_Division.ObtenerDivision();
+            List<GC_Division> ListDivisions =  sGC_Division.ObtenerDivision();
             #endregion
 
             #region Obtener Wrapupcode(Tipificaciones)  -- validar cuando falle el método
             List<GC_Wrapupcode> ListWrapupcode = new List<GC_Wrapupcode>();
-            ListWrapupcode = SGC_Wrapupcode.ObtenerWrapupcode();
+            ListWrapupcode = await SGC_Wrapupcode.ObtenerWrapupcode(ListDivisions);
             #endregion
 
             #region Configurar fechas de evaluación

@@ -21,6 +21,8 @@ using System.Text;
 using DocumentFormat.OpenXml.Bibliography;
 using Newtonsoft.Json;
 using DocumentFormat.OpenXml.Office2010.ExcelAc;
+using DocumentFormat.OpenXml.Drawing.Charts;
+using System.Runtime.CompilerServices;
 
 
 
@@ -64,11 +66,8 @@ namespace Grabaciones.Services.Repositorio
             List<XmlGrabaciones> L_GC_RecordingsXml_Path = new List<XmlGrabaciones>();
             List<GC_LeerCsv> ArchivosCsvJuntos = new List<GC_LeerCsv>();
 
-            
-
-
-
             string ?xmlRutaPrincipal = _config.GetValue<string>("ConfiguracionAudio:RutaPrincipal");
+            string? xmlOrganizacion = _config.GetValue<string>("ConfiguracionAudio:Organization");
             string ?xmlNombreCarpeta = _config.GetValue<string>("ConfiguracionAudio:NombreCarpeta");
             string ?xmlCliente = _config.GetValue<string>("ConfiguracionAudio:Cliente");
             
@@ -78,10 +77,7 @@ namespace Grabaciones.Services.Repositorio
             string ? connectionString = _config.GetValue<string>("ConnectionStrings:DefaultConnection");
             string ? nombreBucket = _config.GetValue<string>("ConfiguracionAWS:bucketName");
 
-            
-
-            string DirectorioAudio = $"{xmlRutaPrincipal}\\{anio}\\{NombreDelMes}";
-            string _directorioGrabaciones = string.Concat(DirectorioAudio, "-", _nombresemana);
+            string _directorioGrabaciones = $"{xmlRutaPrincipal}\\{xmlOrganizacion}\\{xmlCliente}";
 
 
             DateTime FechaEjecucion = DateTime.Now;
@@ -104,27 +100,29 @@ namespace Grabaciones.Services.Repositorio
             #endregion
 
             #region Obtener Divisiones -- validar cuando falle el método
-            List<GC_Division> ListDivisions = new List<GC_Division>();
-            ListDivisions = sGC_Division.ObtenerDivision();
-            #endregion
-
-            #region Obtener Wrapupcode(Tipificaciones)  -- validar cuando falle el método
-            List<GC_Wrapupcode> ListWrapupcode = new List<GC_Wrapupcode>();
-            ListWrapupcode = SGC_Wrapupcode.ObtenerWrapupcode();
+            List<GC_Division> ListDivisions = sGC_Division.ObtenerDivision();
             #endregion
 
             #region obtener usuarios
-            List<GC_Users> GC_Users = SGC_Users.ObtenerUsuarios();
+            List<GC_Users> GC_Users = await SGC_Users.ObtenerUsuarios();
             #endregion
 
             #region Obtener Colas
-            List<GC_Queue> GC_Queues = SGC_Queue.ObtenerColas();
+            //List<GC_Queue> GC_Queues = SGC_Queue.ObtenerColas();
+            List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            #endregion
 
-            string json = JsonConvert.SerializeObject(GC_Queues, Formatting.Indented);
+
+            #region Obtener las campañas por division
+            List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            #endregion
+
+            #region Obtener Wrapupcode(Tipificaciones)  -- validar cuando falle el método
+            //List<GC_Wrapupcode> ListWrapupcode = await  SGC_Wrapupcode.ObtenerWrapupcode(ListDivisions.Where(d=>d.name.Equals("PACIFICO")).ToList());
             #endregion
 
             #region Obtener Skill
-            List<GC_Skill> GC_Skills = await SGC_Skill.ObtenerSkills();
+            //List<GC_Skill> GC_Skills = await SGC_Skill.ObtenerSkills();
             #endregion
 
             #region filtrar colas a buscar
@@ -133,7 +131,7 @@ namespace Grabaciones.Services.Repositorio
             // Agrupa las colas cuya inicial (según la lista de países) se encuentre al inicio del nombre, seguida de '_'
             // Filtrar las colas cuyo nombre comience exactamente con la inicial seguida de '_' y agruparlas por país
 
-            List<EC_GruposPaisCola> PaisCola = SGC_Queue.ObtenerColasAgrupadasPorPais(GC_Queues, paises, TotalGrabaciones, GC_Skills);
+            //List<EC_GruposPaisCola> PaisCola = SGC_Queue.ObtenerColasAgrupadasPorPais(GC_Queues, paises, TotalGrabaciones, GC_Skills);
 
             //string json2 = JsonConvert.SerializeObject(groupedQueues, Formatting.Indented);
             #endregion
@@ -153,6 +151,7 @@ namespace Grabaciones.Services.Repositorio
             List<XmlGrabaciones> listXmlGrabaciones = new List<XmlGrabaciones>();
             List<GC_ImprimirExcel> listImprimirExcel = new List<GC_ImprimirExcel>();
             List<EC_CSVYanbal> listImprimirCSV = new List<EC_CSVYanbal>();
+            string divisionName = string.Empty;
 
            
                 rangoFechas = vFechaInicioIntervalo.ToString("yyyy-MM-ddTHH:mm:ss") + "/" + vFechaFinIntervalo.ToString("yyyy-MM-ddTHH:mm:ss");
@@ -162,9 +161,9 @@ namespace Grabaciones.Services.Repositorio
                 await EC_EscribirLog.EscribirLogAsync("Las conversaciones a evaluar son del rango: "+rangoFechas);
 
                 // se extrae todas las conversaciones por país
-                List<AnalyticsConversationWithoutAttributes> conversationDetails = await SGC_ConversationsDetailsQuery.ObtenerConversaciones_x_Cola(rangoFechas, ValueSegmentQuery, _config, PaisCola);
+                //List<AnalyticsConversationWithoutAttributes> conversationDetails = await SGC_ConversationsDetailsQuery.ObtenerConversaciones_x_Cola(rangoFechas, ValueSegmentQuery, _config, PaisCola);
                 
-                //List<AnalyticsConversationWithoutAttributes> conversationDetailsPaisCola = SGC_ConversationsDetailsQuery.ObtenerConversaciones(rangoFechas, ValueSegmentQuery, _config);
+                List<AnalyticsConversationWithoutAttributes> conversationDetails = await SGC_ConversationsDetailsQuery.ObtenerConversaciones(rangoFechas, ValueSegmentQuery, _config);
 
                 await EC_EscribirLog.EscribirLogAsync("Se traerá información de un total de: " + conversationDetails.Count().ToString() + " conversaciones(Hits) de todos los paises");
                 #endregion
@@ -192,16 +191,21 @@ namespace Grabaciones.Services.Repositorio
                     {
                         await EC_EscribirLog.EscribirLogAsync($"Conversacion[{iConversacion}]");
 
-                        await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
+                        ////await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
 
-                        tasks.Add(Task.Run(async () =>
-                        {
+                        ////tasks.Add(Task.Run(async () =>
+                        ////{
                             try
                             {
                                 // ✅ Espera para cumplir 4 llamadas por segundo
                                 //await rateLimiter.WaitAsync();
 
-                                await ProcesarConversaciones(conversation, listXmlGrabaciones, listImprimirExcel, PaisCola, vFechaInicioIntervalo, DirectorioAudio, rateLimiter, iConversacion);
+                                await ProcesarConversaciones(conversation, listXmlGrabaciones, 
+                                                            listImprimirExcel,
+                                                            //PaisCola, 
+                                                            vFechaInicioIntervalo, _directorioGrabaciones, 
+                                                            rateLimiter, iConversacion, 
+                                                            ListDivisions, GC_Queues, GC_Campaigns);
 
                                 int processed = Interlocked.Increment(ref procesadas);
                                 if (processed % 100 == 0)
@@ -217,12 +221,12 @@ namespace Grabaciones.Services.Repositorio
                             {
                                 throttler.Release(); // Liberar el semáforo
                             }
-                        }));
+                        ////}));
                         iConversacion++;
                     }
 
                     // Esperar a que todas las tareas terminen
-                    await Task.WhenAll(tasks);
+                    ////await Task.WhenAll(tasks);
                 }
                 #endregion
 
@@ -283,7 +287,7 @@ namespace Grabaciones.Services.Repositorio
                                 IVRSelection = iGrabaciones.IVRSelection,
                                 HoldTime = iGrabaciones.HoldTime,
                                 Dnis = iGrabaciones.Dnis,
-                                DirectorioCSV = DirectorioAudio,
+                               // DirectorioCSV = DirectorioAudio,
                                 rutacompletaAudio = iGrabaciones.xmlRutaCompletaAudioMP3
                             });
 
@@ -351,7 +355,7 @@ namespace Grabaciones.Services.Repositorio
 
                 #region Enviar las grabaciones a Bucket AWS
                 await EC_EscribirLog.EscribirLogAsync($"Inicio de proceso de envio de grabaciones a Bucket");
-                string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, DirectorioAudio);
+                string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, "DirectorioAudio");
                 #endregion
             }
             #endregion
@@ -433,10 +437,13 @@ namespace Grabaciones.Services.Repositorio
             AnalyticsConversationWithoutAttributes conversation,
             List<XmlGrabaciones> listXmlGrabaciones,
             List<GC_ImprimirExcel> listImprimirExcel,
-            List<EC_GruposPaisCola> PaisCola,
+           // List<EC_GruposPaisCola> PaisCola,
             DateTime vFechaInicioIntervalo,
-            string DirectorioAudio,
-            SimpleRateLimiter rateLimiter, int iconversation
+            string DirectorioGrabaciones,
+            SimpleRateLimiter rateLimiter, int iconversation,
+            List<GC_Division> ListDivisions ,
+            List<GC_Queue> listQueues,
+            List<EC_Campaign> listCampaign
         )
         {
             string? xmlFormato = _config.GetValue<string>("ConfiguracionAudio:Formato");
@@ -444,10 +451,11 @@ namespace Grabaciones.Services.Repositorio
             string? xmlEmpresa = _config.GetValue<string>("ConfiguracionAudio:Empresa");
             string? xmlOrganizacion = _config.GetValue<string>("ConfiguracionAudio:Organization");
 
-            
 
 
-                #region variables iniciales
+
+            #region variables iniciales
+                string direccion = string.Empty;
                 string recordingId = string.Empty;
                 string conversationId = conversation.ConversationId;
                 string? direction = conversation.OriginatingDirection == null ? "" : conversation.OriginatingDirection.ToString();
@@ -459,113 +467,81 @@ namespace Grabaciones.Services.Repositorio
                 long duration = 0;
                 long acw = 0;
                 string ani = string.Empty;
-                string paisName = string.Empty;
-                string queueName = string.Empty;
+
+                string direccionOrigen = string.Empty;
+                string nameQqueue = string.Empty;
+                string nameCampaign = string.Empty;
                 string nameDivision = string.Empty;
-                string ivrSelection = string.Empty;
-                int holdTime = 0;
-                string dnis = string.Empty;
+                string phoneNumber = string.Empty;
+                string dniAsesor = string.Empty;
+                string direccionAudio = string.Empty;
+
+            // datos para el XML
+
+                string xmlDniCliente = "xmlDniCliente";
+                string xmlApellidoPaterno = "xmlApellidoPaterno";
+                string xmlApellidoMaterno = "xmlApellidoMaterno";
+                string xmlNombres = "xmlNombres";
+                string xmlTelefono = "xmlTelefono";
+                string xmlNumeroAsesor = string.Empty;
+                string xmlFechaDeServicio = string.Empty;
+                string xmlHoraDeServicio = string.Empty;
+                string xmlProceso = "xmlProceso";
+                string xmlVdn = "xmlVdn";
+                string xmlSkill = "xmlSkill";
+                string xmlRamo = "xmlRamo";
+                string xmlProducto = "xmlProducto";
+                string xmlResultado = "xmlResultado";
+                string xmlSubResultado = "xmlSubResultado";
+
                 #endregion
 
-                if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Inbound)
+                if (conversation.ConversationId is null || conversation.ConversationId == "")
                 {
-                    await EC_EscribirLog.EscribirLogAsync($"Conversacion Outbound - {conversation.ConversationId}");
-                    foreach (var oParticipant in conversation.Participants)
+                    await EC_EscribirLog.EscribirLogAsync($"No se obtuvo la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+                    return;
+                }
+                else
+                {
+                    if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Outbound)
                     {
+                        await EC_EscribirLog.EscribirLogAsync($"Se obtinen datos Outbound de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
 
-                        if (oParticipant.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Acd)
+                        direccionOrigen = conversation.OriginatingDirection.ToString().ToUpper();
+
+                        CallConversation callConversation = await SGC_ConversationsCall.ObtenerCallConversation(conversation.ConversationId);
+
+                        if (conversation.Participants[0].Purpose== AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
                         {
-                            foreach (var _session in oParticipant.Sessions)
-                            {
-                                // segments
-                                foreach (var _segment in _session.Segments)
-                                {
-                                    if (_segment.QueueId != null)
-                                    {
-                                        // si la cola no es hub_peru-Bolivia
-                                        if (_segment.QueueId != "aa8d9650-8fba-4a06-ad60-e96a99f27233")
-                                        {
-                                            var pqResultado = PaisCola
-                                                .SelectMany(grupo => grupo.colas.Select(cola => new
-                                                {
-                                                    grupo.pais,
-                                                    cola.QueueId,
-                                                    cola.QueueName
-                                                }))
-
-                                                .FirstOrDefault(x => x.QueueId == _segment.QueueId);
-                                            if (pqResultado != null)
-                                            {
-                                                queueName = pqResultado.QueueName;
-                                                paisName = pqResultado.pais;
-                                                break;
-                                            }
-                                        }
-                                        // si la cola es HUB_Peru-Bolivia
-                                        else
-                                        {
-
-                                            string idSkillSegment = _segment.RequestedRoutingSkillIds[0];
-                                            var resultadoNamePais = PaisCola
-                                            .FirstOrDefault(p => p.aptitudes != null && p.aptitudes.Any(s => s.skillID == idSkillSegment));
-                                            paisName = resultadoNamePais.pais;
-                                            queueName = "HUB_Peru-Bolivia";
-                                            break;
-
-                                        }
-                                    }
-                                }
-                            }
+                            await EC_EscribirLog.EscribirLogAsync($"Se obtuvo el agente de la llamada manual de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
                         }
-
-                        if (oParticipant.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
+                        else
                         {
-                            foreach (var _session in oParticipant.Sessions)
-                            {
-                                if (_session.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
-                                {
-                                    ani = _ecMetodos.ReemplazarTelefonoxVacio(_session.Ani);
-                                    dnis = _ecMetodos.ReemplazarTelefonoxVacio(_session.Dnis);
-                                    userId = ani;
-                                    //agentId = oParticipant.UserId;
+                            await EC_EscribirLog.EscribirLogAsync($"Se obtienen datos de la llamada no manual de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+                            List<string> camposParaApi = new List<string>();
 
-                                    //metrics
-                                    foreach (var _metrics in _session.Metrics)
-                                    {
-                                        if (_metrics.Name == "tAcw")
-                                        {
-                                            acw = acw + _metrics.Value ?? 0; // si es null, asigna 0
-                                        }
-                                        if (_metrics.Name == "tTalk")
-                                        {
-                                            duration = duration + _metrics.Value ?? 0; // si es null, asigna 0
-                                        }
-                                    }
+                            //obtener el nombre de la division
+                            nameDivision = await _ecMetodos.GetDivisionName(ListDivisions, conversation.DivisionIds[0]);
+                            //obtener el nombre de la campaña
+                            nameCampaign = await _ecMetodos.GetCampaignName(conversation, listCampaign);
+                            // Obtener número de telefono
+                            phoneNumber = await _ecMetodos.GetNumeroTelefono(conversation);
+                            //Obtener DNI del Asesor
+                            dniAsesor = await _ecMetodos.GetDNIAsesor(callConversation);
 
-                                    // segments
-                                    foreach (var _segment in _session.Segments)
-                                    {
-                                        if (_segment.SegmentType == AnalyticsConversationSegment.SegmentTypeEnum.Hold)
-                                        {
-                                            TimeSpan vholdTime = _segment.SegmentEnd.Value - _segment.SegmentStart.Value;
-                                            var seconds = +vholdTime.TotalSeconds;
-
-                                            holdTime = holdTime + (int)seconds;
-                                        }
-                                    }
-
-
-                                }
-                            }
                         }
                     }
+                    else if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Inbound)
+                    {
+                        CallConversation callConversation = await SGC_ConversationsCall.ObtenerCallConversation(conversation.ConversationId);
+                        await EC_EscribirLog.EscribirLogAsync($"Se obtinen datos Inbound de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+                    }
+                    else
+                    {
+                        await EC_EscribirLog.EscribirLogAsync($"No se obtuvo el tipo de dirección de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+                        return;
+                    }
 
-
-
-                }
-                if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Outbound)
-                {
-                    await EC_EscribirLog.EscribirLogAsync($"Conversacion Outbound - {conversation.ConversationId}");
                 }
 
                 #region metadata de conversacion según conversationId
@@ -573,10 +549,10 @@ namespace Grabaciones.Services.Repositorio
                 List<RecordingMetadata> vRecordingMetadata = await SGC_ConversationRecordingmetadata.ObtenerConversationRecordingmetadata(conversation.ConversationId, vFechaInicioIntervalo);
 
                 string? vOriginatingDirection = conversation.OriginatingDirection.ToString();
+                string? nombreDivision = await _ecMetodos.GetDivisionName(ListDivisions, conversation.DivisionIds[0]);
+
                 foreach (var iRecording in vRecordingMetadata)
                 {
-
-                    //if(iRecording.StartTime.to)
 
                     XmlGrabaciones xmlGrabaciones = new XmlGrabaciones();
 
@@ -590,8 +566,8 @@ namespace Grabaciones.Services.Repositorio
                     Recording DatosMP3 = new Recording();
                     await EC_EscribirLog.EscribirLogAsync("Se extrae la información de las grabaciones de la conversación: " + iRecording.ConversationId + " y de la grabacion: " + iRecording.Id + " - con una duracion de " + nDiferenciaSegundos.ToString());
                     
+                    //obtener los datos dela grabacion en MP3
                     DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
-                    
 
                     if(DatosMP3 is null)
                     {
@@ -601,21 +577,21 @@ namespace Grabaciones.Services.Repositorio
                     #region datos que ayudan en la generación de archivo xml y descarga ed audio
 
                     #region se establecen valores de la fecha de grabacion
-                        string _ConversationID = DatosMP3.ConversationId;
-                        string _RecordingId = DatosMP3.Id;
-                        string _SessionId = DatosMP3.SessionId;
-                        DateTime StartTime = DateTime.Parse(DatosMP3.StartTime);
-                        DateTime EndTime = DateTime.Parse(DatosMP3.EndTime);
-                        string _anio = StartTime.ToString("yyyy");
-                        string _mes = StartTime.ToString("MM");
-                        string _dia = StartTime.ToString("dd");
-                        string _Hour = StartTime.ToString("HH");
-                        string _Minute = StartTime.ToString("mm");
-                        string _Seconds = StartTime.ToString("ss");
-                        string _FechaRecording = StartTime.ToString("dd/MM/yyyy");
-                        string _HoraRecording = StartTime.ToString("HH:mm:ss");
+                    string _ConversationID = DatosMP3.ConversationId;
+                    string _RecordingId = DatosMP3.Id;
+                    string _SessionId = DatosMP3.SessionId;
+                    DateTime StartTime = DateTime.Parse(DatosMP3.StartTime);
+                    DateTime EndTime = DateTime.Parse(DatosMP3.EndTime);
+                    string _anio = StartTime.ToString("yyyy");
+                    string _mes = StartTime.ToString("MM");
+                    string _dia = StartTime.ToString("dd");
+                    string _Hour = StartTime.ToString("HH");
+                    string _Minute = StartTime.ToString("mm");
+                    string _Seconds = StartTime.ToString("ss");
+                    xmlFechaDeServicio = StartTime.ToString("dd/MM/yyyy");
+                    xmlHoraDeServicio = StartTime.ToString("HH:mm:ss");
 
-                        #endregion
+                    #endregion
 
                     #region Datos para Excel
                     string eFecha = StartTime.ToString("yyyy-MM-dd");
@@ -626,12 +602,13 @@ namespace Grabaciones.Services.Repositorio
 
                     #endregion = "";
 
-                    string _directorio = string.Concat(DirectorioAudio);
+                    
                     // string _directorio = string.Concat(DirectorioAudio, "/", _anio, "/", _mes, "/", _dia);
                     string _NomenclaturaAudioMP3 = "";
                     string _Audiomp3 = "";
                     string _NombreAudioExcel = "";
                     string _urlAudio = "";
+                    string _directorioAudio = string.Empty;
                     string _directorioFTP = "";
                     string _archivolocal = "";
 
@@ -653,14 +630,14 @@ namespace Grabaciones.Services.Repositorio
                     _users = DatosMP3.Users;
                     agentId = _users.Count() > 0 ? _users[0].Username : "NN";
 
-                    #endregion
-
-                    string NombredelAudio = $"{paisName}_{conversationId}_{recordingId}"; //string.Concat(eDia, "-",eMes, "-",eAnio, "_", _RecordingId,"_", eNombreApellidos.Replace(" ", "-").Replace(@"\", "").Replace(@"/", ""), "_",_Telefono);
+                #endregion
+                    direccionAudio = direccionOrigen == "OUTBOUND" ? "O" : "I";
+                    string NombredelAudio = $"{_anio}{_mes}_{_anio}{_mes}{_dia}{_Hour}{_Minute}{_Seconds}_{phoneNumber}_{dniAsesor}_{direccionAudio}"; //string.Concat(eDia, "-",eMes, "-",eAnio, "_", _RecordingId,"_", eNombreApellidos.Replace(" ", "-").Replace(@"\", "").Replace(@"/", ""), "_",_Telefono);
                     NombredelAudio = await _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
                     await EC_EscribirLog.EscribirLogAsync($"Nombre del audio=>{NombredelAudio}");
                     _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
-
-                    _Audiomp3 = string.Concat(_directorio, "/", _NomenclaturaAudioMP3);
+                    _directorioAudio = $"{DirectorioGrabaciones}/{nameDivision}/{direccionOrigen}/{nameCampaign}/{_anio}/{_mes}/{_dia}";
+                    _Audiomp3 = string.Concat(_directorioAudio, "/", _NomenclaturaAudioMP3);
 
                     #region Crear el objeto xml
 
@@ -680,14 +657,12 @@ namespace Grabaciones.Services.Repositorio
                     xmlGrabaciones.WrapUpCode = wrapupcode;
                     xmlGrabaciones.ACW = acw;
                     xmlGrabaciones.ANI = ani;
-                    xmlGrabaciones.QueueName = queueName;
+                    xmlGrabaciones.QueueName = nameQqueue;
                     xmlGrabaciones.NameDivision = nameDivision;
-                    xmlGrabaciones.IVRSelection = ivrSelection;
-                    xmlGrabaciones.HoldTime = holdTime;
-                    xmlGrabaciones.Dnis = dnis;
+                   
 
-                    xmlGrabaciones.xmlRutadeAudio = _directorio;
-                    xmlGrabaciones.xmlRutaCompletaAudioMP3 = _directorio + "/" + _NomenclaturaAudioMP3;
+                    xmlGrabaciones.xmlRutadeAudio = _directorioAudio;
+                    xmlGrabaciones.xmlRutaCompletaAudioMP3 = _Audiomp3;
                     xmlGrabaciones.xmlNombreAudioExcel = _NombreAudioExcel;
                     xmlGrabaciones.eFecha = eFecha;
                     xmlGrabaciones.eAnio = eAnio;
