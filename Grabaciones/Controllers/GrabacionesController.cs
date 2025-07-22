@@ -58,7 +58,7 @@ namespace Grabaciones.Controllers
                     _ECmetodos.EscribirLog("La descarga es para el metodo menor a 60 días");
                     vresponseRepositorio = await _descargaDiaria.DescargaDiaria(FechaInicio, FechaFin);
 
-                    EC_EscribirLog.EscribirLog($"Controlador: Descarga ed grabaciones terminada con exito");
+                    await EC_EscribirLog.EscribirLogAsync($"Controlador: Descarga ed grabaciones terminada con exito");
                     return Ok(vresponseRepositorio);
 
                 }

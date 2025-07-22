@@ -29,7 +29,6 @@ namespace Grabaciones.Services.Interface
 
         Task<string> EliminarCaracteresEspeciales(string cadena);
 
-        Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
 
         Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString);
 
@@ -39,8 +38,29 @@ namespace Grabaciones.Services.Interface
 
         Task<string> GetCampaignName(AnalyticsConversationWithoutAttributes conversation, List<EC_Campaign> listCampaign);
 
-        Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation);
+        Task<string> GetCampaignName60DiasMas(AnalyticsConversation conversation, List<EC_Campaign> listCampaign);
+
+        Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation,string direccionOrigen);
+
+        Task<string> GetNumeroTelefono60DiasMas(AnalyticsConversation conversation, string direccionOrigen);
 
         Task<string> GetDNIAsesor(CallConversation callConversation);
+
+        Task<string> GetDNIAsesor60DiasMas(List<AnalyticsParticipant> participants);
+
+        Task<string> GetQueueName(AnalyticsConversationWithoutAttributes conversation, List<GC_Queue> listQueue);
+
+        Task<string> GetQueueName60DiasMas(AnalyticsConversation conversation, List<GC_Queue> listQueue);
+
+        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation);
+
+        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(List<AnalyticsParticipant> Participants);
+
+        Task CreateUpdateXMLGC(List<XmlGrabaciones> listMetadata);
+
+        Task CargaSFTPAmazon(string localFilePath, string directorioRemoto, string rutaArchivoRemoto);
+
+       // Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
+        Task<bool> SubirArchivosSFTPKonecta(string archivo, string periodo);
     }
 }

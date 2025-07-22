@@ -52,20 +52,20 @@ namespace Grabaciones.Services.GenesysCloud
 
             #region  oSegmentDetailQueryPredicate
             oSegmentDetailQuery = new List<SegmentDetailQueryFilter>() {
-                new SegmentDetailQueryFilter {
-                Type = SegmentDetailQueryFilter.TypeEnum.Or,
-                Predicates = new List<SegmentDetailQueryPredicate>()
-                    {
-                        new SegmentDetailQueryPredicate{
-                            Dimension = SegmentDetailQueryPredicate.DimensionEnum.Mediatype,
-                            Value = "voice"
-                        },
-                        new SegmentDetailQueryPredicate{
-                            Dimension = SegmentDetailQueryPredicate.DimensionEnum.Mediatype,
-                            Value = "callback"
-                        },
-                    }
-                },
+                //new SegmentDetailQueryFilter {
+                //Type = SegmentDetailQueryFilter.TypeEnum.Or,
+                //Predicates = new List<SegmentDetailQueryPredicate>()
+                //    {
+                //        new SegmentDetailQueryPredicate{
+                //            Dimension = SegmentDetailQueryPredicate.DimensionEnum.Mediatype,
+                //            Value = "voice"
+                //        },
+                //        new SegmentDetailQueryPredicate{
+                //            Dimension = SegmentDetailQueryPredicate.DimensionEnum.Mediatype,
+                //            Value = "callback"
+                //        },
+                //    }
+                //},
                 new SegmentDetailQueryFilter
                 {
                     Type = SegmentDetailQueryFilter.TypeEnum.Or,
@@ -149,6 +149,7 @@ namespace Grabaciones.Services.GenesysCloud
                 //},
 
             };
+            // body.ConversationFilters = oConversationDetailQueryFilter;
             #endregion
 
             rangoFechas = vFechaInicioIntervalo.ToString("yyyy-MM-ddTHH:mm:ss") + "/" + vFechaFinIntervalo.ToString("yyyy-MM-ddTHH:mm:ss");
@@ -157,7 +158,6 @@ namespace Grabaciones.Services.GenesysCloud
 
             body.Interval = ValueSegmentQuery;
             body.SegmentFilters = oSegmentDetailQuery;
-            body.ConversationFilters = oConversationDetailQueryFilter;
             body.Order = AsyncConversationQuery.OrderEnum.Asc;
             body.OrderBy = AsyncConversationQuery.OrderByEnum.Conversationstart;
             body.StartOfDayIntervalMatching = true;
@@ -171,6 +171,7 @@ namespace Grabaciones.Services.GenesysCloud
             {
                 try
                 {
+                    
                     AsyncQueryResponse getJobID = apiInstance.PostAnalyticsConversationsDetailsJobs(body);
                     jobId = getJobID.JobId;
                     //WriteLog.EscribirLog("Intervalo: " + dates + " || JobID: " + getJobID.JobId);

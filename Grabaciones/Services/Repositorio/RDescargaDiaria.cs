@@ -109,12 +109,11 @@ namespace Grabaciones.Services.Repositorio
 
             #region Obtener Colas
             //List<GC_Queue> GC_Queues = SGC_Queue.ObtenerColas();
-            List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
             #endregion
 
-
             #region Obtener las campañas por division
-            List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
             #endregion
 
             #region Obtener Wrapupcode(Tipificaciones)  -- validar cuando falle el método
@@ -151,6 +150,7 @@ namespace Grabaciones.Services.Repositorio
             List<XmlGrabaciones> listXmlGrabaciones = new List<XmlGrabaciones>();
             List<GC_ImprimirExcel> listImprimirExcel = new List<GC_ImprimirExcel>();
             List<EC_CSVYanbal> listImprimirCSV = new List<EC_CSVYanbal>();
+            List<EC_Metadata> listMetadata = new List<EC_Metadata>();
             string divisionName = string.Empty;
 
            
@@ -175,15 +175,12 @@ namespace Grabaciones.Services.Repositorio
                 }
                 else
                 {
-                // Semáforo para limitar peticiones concurrentes
-                    
+                    // Semáforo para limitar peticiones concurrentes                    
                     var throttler = new SemaphoreSlim(initialCount: peticionesConcurrentes); // Ajustar según rendimiento deseado
                     var tasks = new List<Task>();
                     var totalConversaciones = conversationDetails.Count;
                     var procesadas = 0;
-
                     int iConversacion = 1;
-
                     // ✅ Limitar a 4 peticiones por segundo
                     var rateLimiter = new SimpleRateLimiter(4);
 
@@ -191,10 +188,10 @@ namespace Grabaciones.Services.Repositorio
                     {
                         await EC_EscribirLog.EscribirLogAsync($"Conversacion[{iConversacion}]");
 
-                        ////await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
+                        //////await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
 
-                        ////tasks.Add(Task.Run(async () =>
-                        ////{
+                        //////tasks.Add(Task.Run(async () =>
+                        //////{
                             try
                             {
                                 // ✅ Espera para cumplir 4 llamadas por segundo
@@ -221,12 +218,13 @@ namespace Grabaciones.Services.Repositorio
                             {
                                 throttler.Release(); // Liberar el semáforo
                             }
-                        ////}));
-                        iConversacion++;
+                    //////}));
+
+                    iConversacion++;
                     }
 
                     // Esperar a que todas las tareas terminen
-                    ////await Task.WhenAll(tasks);
+                        await Task.WhenAll(tasks);
                 }
                 #endregion
 
@@ -240,6 +238,13 @@ namespace Grabaciones.Services.Repositorio
 
             if (listXmlGrabaciones != null && listXmlGrabaciones.Count() > 0)
             {
+
+
+                #region Crear archivo xml
+                await _ecMetodos.CreateUpdateXMLGC(listXmlGrabaciones);
+                #endregion
+
+
                 foreach (var iGrabaciones in listXmlGrabaciones)
                 {
                     if (iGrabaciones.xmlUrlGCAudio == "NoExisteUri")
@@ -248,47 +253,26 @@ namespace Grabaciones.Services.Repositorio
                     }
                     else
                     {
-                            //EC_CSVYanbal objExcel = new EC_CSVYanbal();
-                        
-                            //objExcel.IdRecording = iGrabaciones.IdRecording;
-                            //objExcel.ConversationId = iGrabaciones.ConversationId;
-                            //objExcel.Direction = iGrabaciones.Direction;
-                            //objExcel.Duration = iGrabaciones.Duration;
-                            //objExcel.ConversationStartTime = iGrabaciones.ConversationStartTime;
-                            //objExcel.ConversationEndTime = iGrabaciones.ConversationEndTime;
-                            //objExcel.Userid = iGrabaciones.Userid;
-                            //objExcel.Agentid = iGrabaciones.Agentid;
-                            //objExcel.WrapUpCode = iGrabaciones.WrapUpCode;
-                            //objExcel.ACW = iGrabaciones.ACW;
-                            //objExcel.ANI= iGrabaciones.ANI;
-                            //objExcel.QueueName = iGrabaciones.QueueName;
-                            //objExcel.NameDivision = iGrabaciones.NameDivision;
-                            //objExcel.IVRSelection = iGrabaciones.IVRSelection;
-                            //objExcel.HoldTime = iGrabaciones.HoldTime;
-                            //objExcel.Dnis = iGrabaciones.Dnis;
-                            //objExcel.DirectorioCSV = DirectorioAudio;
+                            
+                            listMetadata.Add(new EC_Metadata {
 
-                            //listImprimirCSV.Add(objExcel);
+                                empresa = iGrabaciones.xmlempresa,
+                                dNICliente = "dNICliente",
+                                apellidoPaterno = "apellidoPaterno",
+                                apellidoMaterno = "apellidoMaterno",
+                                nombres = "nombres",
+                                telefono = "telefono",
+                                fechaDeServicio = "fechaDeServicio",
+                                horaDeServicio = "horaDeServicio",
+                                NroAsesor = "NroAsesor",
+                                Proceso = "Proceso",
+                                vdn = "vdn",
+                                skill = "skill",
+                                ramo = "ramo",
+                                producto = "producto",
+                                resultado = "resultado",
+                                subResultado = "subResultado"
 
-                            listImprimirCSV.Add(new EC_CSVYanbal {
-                                IdRecording= iGrabaciones.IdRecording,
-                                ConversationId= iGrabaciones.ConversationId,
-                                Direction = iGrabaciones.Direction,
-                                Duration = iGrabaciones.Duration,
-                                ConversationStartTime = iGrabaciones.ConversationStartTime,
-                                ConversationEndTime = iGrabaciones.ConversationEndTime,
-                                Userid = iGrabaciones.Userid,
-                                Agentid = iGrabaciones.Agentid,
-                                WrapUpCode = iGrabaciones.WrapUpCode,
-                                ACW = iGrabaciones.ACW,
-                                ANI = iGrabaciones.ANI,
-                                QueueName = iGrabaciones.QueueName,
-                                NameDivision = iGrabaciones.NameDivision,
-                                IVRSelection = iGrabaciones.IVRSelection,
-                                HoldTime = iGrabaciones.HoldTime,
-                                Dnis = iGrabaciones.Dnis,
-                               // DirectorioCSV = DirectorioAudio,
-                                rutacompletaAudio = iGrabaciones.xmlRutaCompletaAudioMP3
                             });
 
 
@@ -327,35 +311,36 @@ namespace Grabaciones.Services.Repositorio
                         }
                 }
 
+                
                 #region crear archivo csv por día
-                try
-                {
-                    var respuesta = _ecMetodos.CrearArchivoCsv(listImprimirCSV);
-                }
-                catch (Exception ex)
-                {
-                    await EC_EscribirLog.EscribirLogAsync($"Error al crear el archivo csv: {ex.Message.ToString()}");
-                    throw;
-                }
+                //try
+                //{
+                //    var respuesta = _ecMetodos.CrearArchivoCsv(listImprimirCSV);
+                //}
+                //catch (Exception ex)
+                //{
+                //    await EC_EscribirLog.EscribirLogAsync($"Error al crear el archivo csv: {ex.Message.ToString()}");
+                //    throw;
+                //}
                 #endregion
 
                 #region Insertar metadata en la base de datos
-                string respuestaSQL = await _ecMetodos.GuardarMetadataEnBaseDatos(listImprimirCSV, connectionString);
-                string respuestaOkErrorSQl = respuestaSQL.Split('|')[0];
+                //string respuestaSQL = await _ecMetodos.GuardarMetadataEnBaseDatos(listImprimirCSV, connectionString);
+                //string respuestaOkErrorSQl = respuestaSQL.Split('|')[0];
 
-                if (respuestaOkErrorSQl == "Ok")
-                {
-                    await EC_EscribirLog.EscribirLogAsync($"Se insertaron correctamente los registros en la base de datos");
-                }
-                else
-                {
-                    await EC_EscribirLog.EscribirLogAsync($"Error al insertar los registros en la base de datos: {respuestaSQL}");
-                }
+                //if (respuestaOkErrorSQl == "Ok")
+                //{
+                //    await EC_EscribirLog.EscribirLogAsync($"Se insertaron correctamente los registros en la base de datos");
+                //}
+                //else
+                //{
+                //    await EC_EscribirLog.EscribirLogAsync($"Error al insertar los registros en la base de datos: {respuestaSQL}");
+                //}
                 #endregion
 
                 #region Enviar las grabaciones a Bucket AWS
-                await EC_EscribirLog.EscribirLogAsync($"Inicio de proceso de envio de grabaciones a Bucket");
-                string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, "DirectorioAudio");
+                //await EC_EscribirLog.EscribirLogAsync($"Inicio de proceso de envio de grabaciones a Bucket");
+                //string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, "DirectorioAudio");
                 #endregion
             }
             #endregion
@@ -389,7 +374,7 @@ namespace Grabaciones.Services.Repositorio
                 #region Imprimir Excel con los audios descargados
                 _ecMetodos.CrearArchivoExcel(ArchivosCsvJuntos);
 
-                await _ecMetodos.SubirArchivosSFTAmazon(ArchivosCsvJuntos[0].ArchivoExcel,_nombresemana,_iAnio.ToString());
+                // await _ecMetodos.SubirArchivosSFTAmazon(ArchivosCsvJuntos[0].ArchivoExcel,_nombresemana,_iAnio.ToString());
 
                 #endregion
 
@@ -451,9 +436,6 @@ namespace Grabaciones.Services.Repositorio
             string? xmlEmpresa = _config.GetValue<string>("ConfiguracionAudio:Empresa");
             string? xmlOrganizacion = _config.GetValue<string>("ConfiguracionAudio:Organization");
 
-
-
-
             #region variables iniciales
                 string direccion = string.Empty;
                 string recordingId = string.Empty;
@@ -470,7 +452,7 @@ namespace Grabaciones.Services.Repositorio
 
                 string direccionOrigen = string.Empty;
                 string nameQqueue = string.Empty;
-                string nameCampaign = string.Empty;
+                string nameCampaignCola = string.Empty;
                 string nameDivision = string.Empty;
                 string phoneNumber = string.Empty;
                 string dniAsesor = string.Empty;
@@ -503,38 +485,54 @@ namespace Grabaciones.Services.Repositorio
                 }
                 else
                 {
-                    if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Outbound)
+                    //obtener la direccion de origen
+                    direccionOrigen = conversation.OriginatingDirection.ToString().ToUpper();
+                    //obtener el nombre de la division
+                    nameDivision = await _ecMetodos.GetDivisionName(ListDivisions, conversation.DivisionIds[0]);
+                    // Obtener número de telefono
+                    phoneNumber = await _ecMetodos.GetNumeroTelefono(conversation,direccionOrigen);
+                    // obtener los datos de la conversacion
+                    CallConversation callConversation = await SGC_ConversationsCall.ObtenerCallConversation(conversation.ConversationId);
+
+                    //Obtener DNI del Asesor
+                    dniAsesor = await _ecMetodos.GetDNIAsesor(callConversation);
+
+                    //Lista para obtener los campos al llamar la api de pacifico
+                    EC_ParametrosApiPacifico metadataPacifico = new EC_ParametrosApiPacifico();
+
+                    metadataPacifico = await _ecMetodos.ObtenerParametroPacifico(callConversation);
+
+                    #region Resultados desde api de pacifico
+                        xmlDniCliente = "xmlDniCliente";
+                        xmlApellidoPaterno = "xmlApellidoPaterno";
+                        xmlApellidoMaterno = "xmlApellidoMaterno";
+                        xmlNombres = "xmlNombres";
+                        xmlTelefono = phoneNumber;
+                        xmlNumeroAsesor = dniAsesor;
+                        xmlProceso = "xmlProceso";
+                        xmlVdn = "xmlVdn";
+                        xmlSkill = "xmlSkill";
+                        xmlRamo = "xmlRamo";
+                        xmlProducto = "xmlProducto";
+                        xmlResultado = "xmlResultado";
+                        xmlSubResultado = "xmlSubResultado";
+                    #endregion
+
+
+                if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Outbound)
                     {
                         await EC_EscribirLog.EscribirLogAsync($"Se obtinen datos Outbound de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+                    
+                        //obtener el nombre de la campaña
+                        nameCampaignCola = await _ecMetodos.GetCampaignName(conversation, listCampaign);
 
-                        direccionOrigen = conversation.OriginatingDirection.ToString().ToUpper();
-
-                        CallConversation callConversation = await SGC_ConversationsCall.ObtenerCallConversation(conversation.ConversationId);
-
-                        if (conversation.Participants[0].Purpose== AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
-                        {
-                            await EC_EscribirLog.EscribirLogAsync($"Se obtuvo el agente de la llamada manual de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
-                        }
-                        else
-                        {
-                            await EC_EscribirLog.EscribirLogAsync($"Se obtienen datos de la llamada no manual de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
-                            List<string> camposParaApi = new List<string>();
-
-                            //obtener el nombre de la division
-                            nameDivision = await _ecMetodos.GetDivisionName(ListDivisions, conversation.DivisionIds[0]);
-                            //obtener el nombre de la campaña
-                            nameCampaign = await _ecMetodos.GetCampaignName(conversation, listCampaign);
-                            // Obtener número de telefono
-                            phoneNumber = await _ecMetodos.GetNumeroTelefono(conversation);
-                            //Obtener DNI del Asesor
-                            dniAsesor = await _ecMetodos.GetDNIAsesor(callConversation);
-
-                        }
                     }
                     else if (conversation.OriginatingDirection == AnalyticsConversationWithoutAttributes.OriginatingDirectionEnum.Inbound)
                     {
-                        CallConversation callConversation = await SGC_ConversationsCall.ObtenerCallConversation(conversation.ConversationId);
                         await EC_EscribirLog.EscribirLogAsync($"Se obtinen datos Inbound de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
+
+                        nameCampaignCola = await _ecMetodos.GetQueueName(conversation, listQueues);
+                    
                     }
                     else
                     {
@@ -567,7 +565,20 @@ namespace Grabaciones.Services.Repositorio
                     await EC_EscribirLog.EscribirLogAsync("Se extrae la información de las grabaciones de la conversación: " + iRecording.ConversationId + " y de la grabacion: " + iRecording.Id + " - con una duracion de " + nDiferenciaSegundos.ToString());
                     
                     //obtener los datos dela grabacion en MP3
-                    DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
+                    if(iRecording.FileState == RecordingMetadata.FileStateEnum.Archived)
+                    {
+                        
+                        await EC_EscribirLog.EscribirLogAsync($"Grabacion disponible: {iRecording.ConversationId} - grabacion: {iRecording.Id}");
+                            
+                    }
+                    else
+                    {
+                        DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
+                        await EC_EscribirLog.EscribirLogAsync($"Grabacion no disponible: {iRecording.ConversationId} - grabacion: {iRecording.Id}");
+                        continue;
+                    }
+
+                    //DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
 
                     if(DatosMP3 is null)
                     {
@@ -631,12 +642,13 @@ namespace Grabaciones.Services.Repositorio
                     agentId = _users.Count() > 0 ? _users[0].Username : "NN";
 
                 #endregion
+
                     direccionAudio = direccionOrigen == "OUTBOUND" ? "O" : "I";
                     string NombredelAudio = $"{_anio}{_mes}_{_anio}{_mes}{_dia}{_Hour}{_Minute}{_Seconds}_{phoneNumber}_{dniAsesor}_{direccionAudio}"; //string.Concat(eDia, "-",eMes, "-",eAnio, "_", _RecordingId,"_", eNombreApellidos.Replace(" ", "-").Replace(@"\", "").Replace(@"/", ""), "_",_Telefono);
                     NombredelAudio = await _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
                     await EC_EscribirLog.EscribirLogAsync($"Nombre del audio=>{NombredelAudio}");
                     _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
-                    _directorioAudio = $"{DirectorioGrabaciones}/{nameDivision}/{direccionOrigen}/{nameCampaign}/{_anio}/{_mes}/{_dia}";
+                    _directorioAudio = $"{DirectorioGrabaciones}/{nameDivision}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}";
                     _Audiomp3 = string.Concat(_directorioAudio, "/", _NomenclaturaAudioMP3);
 
                     #region Crear el objeto xml
@@ -674,11 +686,29 @@ namespace Grabaciones.Services.Repositorio
                     xmlGrabaciones.xmldirectorioFTP = _directorioFTP.Replace("\\", @"\");
                     xmlGrabaciones.xmlArchivolocal = _archivolocal;
 
+                    //Datos para pacifico
+                    xmlGrabaciones.p_nameCampaignCola = nameCampaignCola;
+                    xmlGrabaciones.p_empresa = xmlEmpresa;
+                    xmlGrabaciones.p_dNICliente = xmlDniCliente;
+                    xmlGrabaciones.p_apellidoPaterno = xmlApellidoPaterno;
+                    xmlGrabaciones.p_apellidoMaterno = xmlApellidoMaterno;
+                    xmlGrabaciones.p_nombres = xmlNombres;
+                    xmlGrabaciones.p_telefono = xmlTelefono;
+                    xmlGrabaciones.p_fechaDeServicio = $"{_anio}-{_mes}-{_dia}";
+                    xmlGrabaciones.p_horaDeServicio = $"{_Hour}:{_Minute}:{_Seconds}";
+                    xmlGrabaciones.p_NroAsesor = xmlNumeroAsesor;
+                    xmlGrabaciones.p_Proceso = xmlProceso;
+                    xmlGrabaciones.p_vdn = xmlVdn;
+                    xmlGrabaciones.p_skill = xmlSkill;
+                    xmlGrabaciones.p_ramo = xmlRamo;
+                    xmlGrabaciones.p_producto = xmlProducto;
+                    xmlGrabaciones.p_resultado = xmlResultado;
+                    xmlGrabaciones.p_subResultado = xmlSubResultado;
 
 
-                    #region metodo para crear directorio y descargar el audio en MP3
-                    #region Crear directorio
-                    try
+                #region metodo para crear directorio y descargar el audio en MP3
+                #region Crear directorio
+                try
                     {
                         await _ecMetodos.CrearDirectorio(xmlGrabaciones.xmlRutadeAudio);
                     }
@@ -695,7 +725,22 @@ namespace Grabaciones.Services.Repositorio
                     {
                         xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
 
-                        if (!xmlGrabaciones.xmlAudioDescargado)
+                        if (xmlGrabaciones.xmlAudioDescargado)
+                        {
+                            ////subir al repositorio de ftp
+                            bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, $"{xmlGrabaciones.eAnio}{xmlGrabaciones.eMes}");
+                            if (respuestaOkSFTKonecta)
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"Archivo subido correctamente al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                            }
+                            else
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                                ////subir al repositorio d amazon
+                                //  await _ecMetodos.SubirArchivosSFTAmazon(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.eAnio, xmlGrabaciones.eMes);
+                            }
+                        }
+                        else // if (xmlGrabaciones.xmlAudioDescargado)
                         {
                             await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
                             continue;
@@ -707,22 +752,27 @@ namespace Grabaciones.Services.Repositorio
                         await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {xmlGrabaciones.conversationID}| recordingID: {xmlGrabaciones.xmlRecordingID}");
                         continue;
                     }
-                #endregion
-                #endregion
+                    #endregion
+                    #endregion
 
-                #endregion
-                    bool yaExiste = listXmlGrabaciones.Any(x =>
-                    x.conversationID == xmlGrabaciones.conversationID &&
-                    x.IdRecording == xmlGrabaciones.IdRecording);
+                    #endregion
+                        bool yaExiste = listXmlGrabaciones.Any(x =>
+                        x.conversationID == xmlGrabaciones.conversationID &&
+                        x.IdRecording == xmlGrabaciones.IdRecording);
 
-                if (!yaExiste)
-                {
-                    listXmlGrabaciones.Add(xmlGrabaciones);
-                }
+                    if (!yaExiste)
+                    {
+                        listXmlGrabaciones.Add(xmlGrabaciones);
+                    }
 
-                #endregion 
+                    #endregion 
                  
-            } //fin del foreach de todas las conversaciones
+                } //fin del foreach de todas las conversaciones
+
+                
+
+
+
         }
         #endregion
     }

@@ -9,6 +9,7 @@ using PureCloudPlatform.Client.V2.Model;
 using Polly;
 using DocumentFormat.OpenXml.Bibliography;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Polly.Retry;
 
 namespace Grabaciones.Services.GenesysCloud
 {
@@ -30,7 +31,7 @@ namespace Grabaciones.Services.GenesysCloud
             Recording result = new Recording();
             int intento = 0;
             
-            var retryPolicy = Polly.Policy
+            AsyncRetryPolicy retryPolicy = Polly.Policy
                    .Handle<ApiException>()
                    .Or<HttpRequestException>()
                    .Or<TimeoutException>()

@@ -441,7 +441,6 @@ namespace Grabaciones.Services.GenesysCloud
 
             #endregion
 
-
             #region Filtros conversationDetailQuery
             oConversationDetailQueryFilter = new List<ConversationDetailQueryFilter>()
             {
@@ -453,30 +452,43 @@ namespace Grabaciones.Services.GenesysCloud
                          new ConversationDetailQueryPredicate()
                          {
                              Dimension = ConversationDetailQueryPredicate.DimensionEnum.Originatingdirection,
-                             Value = "outbound"
+                             //Value = "inbound"
+                             Value="outbound"
+                         },
+                         new ConversationDetailQueryPredicate()
+                         {
+                             Dimension = ConversationDetailQueryPredicate.DimensionEnum.Originatingdirection,
+                             //Value = "inbound"
+                             Value="inbound"
                          }
                      }
                  },
-                new ConversationDetailQueryFilter
-                {
-                    Type = ConversationDetailQueryFilter.TypeEnum.And,
-                    Predicates = new List<ConversationDetailQueryPredicate>()
-                    {
-                        new ConversationDetailQueryPredicate()
-                        {
-                            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
-                            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
-                            Value = "3b2113bf-07f8-4c4e-826d-f785b02a31c4"
-                        }
-                    }
-                }
+                
+                //new ConversationDetailQueryFilter
+                //{
+                //    Type = ConversationDetailQueryFilter.TypeEnum.And,
+                //    Predicates = new List<ConversationDetailQueryPredicate>()
+                //    {
+                //        new ConversationDetailQueryPredicate()
+                //        {
+                //            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
+                //            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
+                //            //outbound
+                //            Value = "3b2113bf-07f8-4c4e-826d-f785b02a31c4"
+
+                //            //inbound
+                //            //Value = "182918ee-932e-4291-9604-99edc02bcbb0"
+                //        }
+                //    }
+                //}
 
             };
+
+            //body.ConversationFilters = oConversationDetailQueryFilter;
             #endregion
 
-			body.Interval = rangoFechas;
+            body.Interval = rangoFechas;
             body.SegmentFilters = oSegmentDetailQuery;
-            body.ConversationFilters = oConversationDetailQueryFilter;
             body.Order = ConversationQuery.OrderEnum.Asc;
             body.OrderBy = ConversationQuery.OrderByEnum.Conversationstart;
 

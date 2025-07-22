@@ -28,6 +28,7 @@
         public string? xmlUrlGCAudio { get; set; }
         public string? xmldirectorioFTP{ get; set; }
         public string? xmlArchivolocal { get; set; }
+        public string? xmlFileStateRecording { get; set; }
 
 
         /// <summary>
@@ -49,10 +50,27 @@
         public long? HoldTime { get; set; }
         public string? Dnis { get; set; }
 
-       
-       
-        /// </summary>
 
+
+        #region Datos para pacifico
+            public string ? p_nameCampaignCola { get; set; }
+            public string? p_empresa { get; set; }
+            public string? p_dNICliente { get; set; }
+            public string? p_apellidoPaterno { get; set; }
+            public string? p_apellidoMaterno { get; set; }
+            public string? p_nombres { get; set; }
+            public string? p_telefono { get; set; }
+            public string? p_fechaDeServicio { get; set; }
+            public string? p_horaDeServicio { get; set; }
+            public string? p_NroAsesor { get; set; }
+            public string? p_Proceso { get; set; }
+            public string? p_vdn { get; set; }
+            public string? p_skill { get; set; }
+            public string? p_ramo { get; set; }
+            public string? p_producto { get; set; }
+            public string? p_resultado { get; set; }
+            public string? p_subResultado { get; set; }
+        #endregion
 
 
 

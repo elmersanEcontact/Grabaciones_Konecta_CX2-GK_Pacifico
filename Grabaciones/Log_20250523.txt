@@ -1,6 +1,0 @@
-******************      Log   20250523       ******************
-23/05/2025 12:43:59 ==>  La descarga es para el metodo menor a 60 días
-23/05/2025 13:08:35 ==>  La descarga es para el metodo menor a 60 días
-23/05/2025 13:14:40 ==>  La descarga es para el metodo menor a 60 días
-23/05/2025 13:20:14 ==>  La descarga es para el metodo menor a 60 días
-23/05/2025 13:25:13 ==>  La descarga es para el metodo menor a 60 días

@@ -26,7 +26,8 @@ namespace Grabaciones.Services.GenesysCloud
             }
 
             #region Validar si la grabacion existe segun la fecha de inicio
-            //foreach (var _item in recordingMetadata) { 
+            //foreach (var _item in recordingMetadata)
+            //{
 
             //    DateTime _startTime = DateTime.Parse(_item.StartTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
             //    _startTime = _startTime.AddHours(-5).Date;

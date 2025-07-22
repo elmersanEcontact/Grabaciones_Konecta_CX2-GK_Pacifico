@@ -7,6 +7,10 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
+using System.Xml;
+using System.Xml.Linq;
+
+
 using ClosedXML.Excel;
 using Grabaciones.Models;
 using static ClosedXML.Excel.XLPredefinedFormat;
@@ -37,6 +41,11 @@ using DocumentFormat.OpenXml.Office2016.Word.Symex;
 using Amazon.S3;
 using Amazon.S3.Transfer;
 using System.Runtime.CompilerServices;
+using Amazon.Runtime.Telemetry;
+using Grabaciones.Services.GenesysCloud;
+using DocumentFormat.OpenXml.Bibliography;
+using PureCloudPlatform.Client.V2.Api;
+using PureCloudPlatform.Client.V2.Client;
 
 
 namespace Grabaciones.Services.Econtact
@@ -438,8 +447,59 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
+        #region Caraga de Archivos a SFTP Amazon
+        public async Task CargaSFTPAmazon(string localFilePath, string directorioRemoto, string rutaArchivoRemoto)
+        {
+            string _host = _config.GetValue<string>("SFTPConfiguration:host");
+            string _username = _config.GetValue<string>("SFTPConfiguration:username");
+            string _baseDirectory = _config.GetValue<string>("SFTPConfiguration:baseDirectory");
+            string _privateKeyFilePath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
+            string subDirectory = directorioRemoto;
+            // Leer clave privada
+            var privateKeyFile = new PrivateKeyFile(_privateKeyFilePath);
+            var authenticationMethods = new[] { new PrivateKeyAuthenticationMethod(_username, privateKeyFile) };
+
+            // Configurar conexión SFTP
+            var connectionInfo = new Renci.SshNet.ConnectionInfo(_host, _username, authenticationMethods);
+
+            try
+            {
+                using (var sftp = new SftpClient(connectionInfo))
+                {
+                    sftp.Connect();
+
+                    // Construir la ruta completa del subdirectorio
+                    var fullDirectoryPath = $"{_baseDirectory}/{subDirectory}";
+
+                    // Crear el subdirectorio si no existe
+                    if (!sftp.Exists(fullDirectoryPath))
+                    {
+                        sftp.CreateDirectory(fullDirectoryPath);
+                    }
+
+                    // Subir el archivo al subdirectorio
+                    using (var fileStream = new FileStream(localFilePath, FileMode.Open))
+                    {
+                        var remoteFileName = System.IO.Path.Combine(fullDirectoryPath, System.IO.Path.GetFileName(localFilePath)).Replace("\\", "/");
+                        sftp.UploadFile(fileStream, remoteFileName);
+                    }
+
+                    Console.WriteLine("Archivo subido exitosamente.");
+                    sftp.Disconnect();
+                }
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error en CargaSFTPAmazon: {ex.Message}");
+                throw;
+            }
+
+
+        }
+        #endregion
+
         #region Carga de Archivos FTP
-		public async Task UploadFTPAudios(string directorioFTP, string archivoGSM, string archivoLocal)
+        public async Task UploadFTPAudios(string directorioFTP, string archivoGSM, string archivoLocal)
 		{
 
 			string servidorFTP = _config.GetValue<string>("ConfiguracionFTP:Servidor");
@@ -1073,99 +1133,81 @@ namespace Grabaciones.Services.Econtact
 
         #endregion
 
-        #region Subir los archivos en sftp de amazon
-        public async Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio)
+        #region Subir a SFTP de Konecta
+        public async Task<bool> SubirArchivosSFTPKonecta(string archivo, string periodo)
         {
+            await EC_EscribirLog.EscribirLogAsync($"Subir archivo a sftp de konect: {archivo}");
+            bool respuesta = false;
+            string host = _config.GetValue<string>("SFTPConfiguration:konectaFTP");
+            string username = _config.GetValue<string>("SFTPConfiguration:userFTP");
+            string passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
+            int puertoFTP = _config.GetValue<int>("SFTPConfiguration:puertoFTP");
+            string privateKeyFilePath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
+            string remoteDirectory = $"{_config.GetValue<string>("SFTPConfiguration:remoteDirectory")}/{periodo}";
 
-            string? host = _config.GetValue<string>("ConfigurationSFTPAmazon:Host");
-            string? username = _config.GetValue<string>("ConfigurationSFTPAmazon:Username");
-            string? privateKeyFilePath = _config.GetValue<string>("ConfigurationSFTPAmazon:PrivateKeyFilePath");
-            string? remoteDirectory = $"{_config.GetValue<string>("ConfigurationSFTPAmazon:RutaServidor")}/{anio}/{nombreSemana}";
-
-            try
+            #region metodo para cargar archivos a SFTP de Konecta-pacifico
+            using (var sftp = new SftpClient(host, puertoFTP, username, passFTP))
             {
-
-                // Cargamos el archivo de clave privada
-                var keyFile = new PrivateKeyFile(privateKeyFilePath);
-                var keyFiles = new[] { keyFile };
-
-
-                // Creamos el método de autenticación con clave privada.
-                // Si necesitas password, puedes combinarlo con PasswordAuthenticationMethod.
-                var authMethods = new AuthenticationMethod[]
+                try
                 {
-                new PrivateKeyAuthenticationMethod(username, keyFiles)
-                };
+                    sftp.Connect();
+                    EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
 
-                var connectionInfo = new Renci.SshNet.ConnectionInfo(
-                host,
-                username,
-                authMethods
-                );
+                    // Verificar si el directorio remoto existe
+                    if (!sftp.Exists(remoteDirectory))
+                    {
+                        sftp.CreateDirectory(remoteDirectory);
+                        EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
+                    }
+                    else
+                    {
+                        EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
+                    }
 
-                using (var sftpClient = new SftpClient(connectionInfo))
-                {
-                    // Nos conectamos al servidor
-                    sftpClient.Connect();
+                    string fileName = System.IO.Path.GetFileName(archivo);
+                    string remoteFilePath = $"{remoteDirectory}/{fileName}";
 
-                    #region Crear directorio en el servidor remoto
-                        // Validar si el directorio remoto existe, si no, crearlo.
-                        // (La función Exists es propia de SftpClient en Renci.SshNet).
-                        if (!sftpClient.Exists(remoteDirectory))
-                        {
-                            sftpClient.CreateDirectory(remoteDirectory);
-                            Console.WriteLine($"Directorio remoto '{remoteDirectory}' creado exitosamente.");
-                            EC_EscribirLog.EscribirLog($"Directorio remoto '{remoteDirectory}' creado exitosamente.");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Directorio remoto '{remoteDirectory}' ya existe. Se omite creación.");
-                            EC_EscribirLog.EscribirLog($"Directorio remoto '{remoteDirectory}' ya existe. Se omite creación.");
-
-                        }
-                    #endregion
-
-                    #region Subimos el archivo al directorio remoto de destino
-
-                        string fileName = System.IO.Path.GetFileName(archivo);
-                        string remoteFile = remoteDirectory.TrimEnd('/') + "/" + fileName;
-
-                        // Verificamos si el archivo ya existe en el servidor
-                        if (sftpClient.Exists(remoteFile))
-                        {
-                            EC_EscribirLog.EscribirLog($"El archivo '{remoteFile}' ya existe en el servidor. Se omite subida.");
-                            Console.WriteLine($"El archivo '{remoteFile}' ya existe en el servidor. Se omite subida.");
-                        
-                        }
-                        // Subida de archivo (envolvemos en Task.Run para que sea asíncrono)
-                        EC_EscribirLog.EscribirLog($"Subiendo archivo: {archivo}|{remoteFile}|{fileName}");
-                        Console.WriteLine($"Subiendo archivo: {fileName}");
-
+                    // Verificar si el archivo ya existe en el directorio remoto
+                    if (sftp.Exists(remoteFilePath))
+                    {
+                        EC_EscribirLog.EscribirLogAsync($"El archivo '{fileName}' ya existe en el directorio remoto, se omite su subida.");
+                    }
+                    else
+                    {
+                        // Subir el archivo
                         await Task.Run(() =>
                         {
-                            using (FileStream fs = new FileStream(archivo, FileMode.Open, FileAccess.Read))
+                            using (var fileStream = new FileStream(archivo, FileMode.Open))
                             {
-                                sftpClient.UploadFile(fs, remoteFile);
+
+                                sftp.UploadFile(fileStream, remoteFilePath);
+                                EC_EscribirLog.EscribirLogAsync($"Archivo '{fileName}' subido correctamente.");
+                                respuesta = true;
                             }
                         });
 
-                    #endregion
-
-
+                    }
+                }
+                catch (Exception ex)
+                {
+                    EC_EscribirLog.EscribirLogAsync($"Error al cargar achivo al sftp pacifico: {ex.Message}");
+                    respuesta = false;
+                }
+                finally
+                {
+                    if (sftp.IsConnected)
+                    {
+                        sftp.Disconnect();
+                        Console.WriteLine("Desconectado del servidor SFTP.");
+                    }
                 }
 
-
-                return true;
             }
-            catch (Exception ex)
-            {
-                EC_EscribirLog.EscribirLog($"Error en la subida de archivos remotos: {ex.Message}");
-                return false;
-                throw;
-            }
-
+            #endregion
+            return respuesta;
         }
         #endregion
+        
 
         #region Metodo para guardar la información de metadata en Base de datos
         public async Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString)
@@ -1460,20 +1502,267 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-        #region Obtener numeros de telefeno
-        public async Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation)
+        #region Obtener el nombre de la campaña de 60 días a más
+        public async Task<string> GetCampaignName60DiasMas(AnalyticsConversation conversation, List<EC_Campaign> listCampaign)
         {
+            string nombreDeCampania = string.Empty;
+            string campaingId = string.Empty;
+
+            try
+            {
+                // Validar conversación
+                if (conversation?.Participants == null || !conversation.Participants.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontraron participantes en la conversación");
+                }
+
+                // Validar lista de campañas
+                if (listCampaign == null || !listCampaign.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync("Lista de campañas vacía o nula");
+                }
+
+                // Obtener ID de campaña
+                campaingId = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipant.PurposeEnum.Customer)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.OutboundCampaignId))
+                    .Select(s => s.OutboundCampaignId)
+                    .FirstOrDefault() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(campaingId))
+                {
+
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontró ID de campaña en participante customer ");
+
+                }
+
+                // Buscar nombre de campaña
+                nombreDeCampania = listCampaign
+                    .Where(c => !string.IsNullOrWhiteSpace(c.IdCampaign))
+                    .FirstOrDefault(c => string.Equals(c.IdCampaign, campaingId, StringComparison.OrdinalIgnoreCase))
+                    ?.NameCampaign ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(nombreDeCampania))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Campaña con ID '{campaingId}' no encontrada en la lista");
+
+                }
+
+            }
+            catch (Exception ex)
+            {
+                string ErrorMessage = $"Error al obtener información de la campaña: {ex.Message}";
+                await EC_EscribirLog.EscribirLogAsync(ErrorMessage);
+            }
+
+            if (nombreDeCampania is null || nombreDeCampania == "")
+            {
+                nombreDeCampania = "SinCampaña";
+            }
+            return nombreDeCampania;
+
+        }
+        #endregion
+
+        #region Obtener el nombre de la cola
+        public async Task<string> GetQueueName(AnalyticsConversationWithoutAttributes conversation, List<GC_Queue> listQueue)
+        {
+            string nombreDeCola = string.Empty;
+            string ? queueId = string.Empty;
+
+            try
+            {
+                
+                if (conversation.Resolutions?.Any() == true)
+                {
+                    queueId = conversation.Resolutions
+                        .Where(r => !string.IsNullOrEmpty(r.QueueId))
+                        .Select(r => r.QueueId)
+                        .FirstOrDefault() ?? string.Empty;
+
+                }
+                else if (queueId == string.Empty)
+                {
+                 
+                    if(conversation.Participants?.Any() == true)
+                    {
+                         queueId = conversation.Participants
+                                    .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Acd ||
+                                               p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
+                                    .Where(p => p.Sessions?.Any() == true)
+                                    .SelectMany(p => p.Sessions)
+                                    .Where(s => s.Segments?.Any() == true)
+                                    .SelectMany(s => s.Segments)
+                                    .Where(seg => !string.IsNullOrWhiteSpace(seg.QueueId))
+                                    .Select(seg => seg.QueueId)
+                                    .FirstOrDefault();
+                    }
+                }
+
+                    
+                if (!string.IsNullOrEmpty(queueId))
+                {
+                    nombreDeCola = listQueue
+                                    .Where(c => !string.IsNullOrWhiteSpace(c.QueueId))
+                                    .FirstOrDefault(c => string.Equals(c.QueueId, queueId, StringComparison.OrdinalIgnoreCase))
+                                    ?.QueueName ?? string.Empty;
+                }
+                // Buscar nombre de campaña
+
+                if (string.IsNullOrWhiteSpace(nombreDeCola))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Cola con ID '{queueId}' no encontrada en la lista");
+                    nombreDeCola=  "SinCola";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                string ErrorMessage = $"Error al obtener información de la campaña: {ex.Message}";
+                await EC_EscribirLog.EscribirLogAsync(ErrorMessage);
+            }
+            return nombreDeCola;
+
+
+        }
+        #endregion
+
+        #region Obtener el nombre de la cola
+        public async Task<string> GetQueueName60DiasMas(AnalyticsConversation conversation, List<GC_Queue> listQueue)
+        {
+            string nombreDeCola = string.Empty;
+            string? queueId = string.Empty;
+
+            try
+            {
+
+                if (conversation.Resolutions?.Any() == true)
+                {
+                    queueId = conversation.Resolutions
+                        .Where(r => !string.IsNullOrEmpty(r.QueueId))
+                        .Select(r => r.QueueId)
+                        .FirstOrDefault() ?? string.Empty;
+
+                }
+                else if (queueId == string.Empty)
+                {
+
+                    if (conversation.Participants?.Any() == true)
+                    {
+                        queueId = conversation.Participants
+                                   .Where(p => p.Purpose == AnalyticsParticipant.PurposeEnum.Acd ||
+                                              p.Purpose == AnalyticsParticipant.PurposeEnum.Agent)
+                                   .Where(p => p.Sessions?.Any() == true)
+                                   .SelectMany(p => p.Sessions)
+                                   .Where(s => s.Segments?.Any() == true)
+                                   .SelectMany(s => s.Segments)
+                                   .Where(seg => !string.IsNullOrWhiteSpace(seg.QueueId))
+                                   .Select(seg => seg.QueueId)
+                                   .FirstOrDefault();
+                    }
+                }
+
+
+                if (!string.IsNullOrEmpty(queueId))
+                {
+                    nombreDeCola = listQueue
+                                    .Where(c => !string.IsNullOrWhiteSpace(c.QueueId))
+                                    .FirstOrDefault(c => string.Equals(c.QueueId, queueId, StringComparison.OrdinalIgnoreCase))
+                                    ?.QueueName ?? string.Empty;
+                }
+                // Buscar nombre de campaña
+
+                if (string.IsNullOrWhiteSpace(nombreDeCola))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Cola con ID '{queueId}' no encontrada en la lista");
+                    nombreDeCola = "SinCola";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                string ErrorMessage = $"Error al obtener información de la campaña: {ex.Message}";
+                await EC_EscribirLog.EscribirLogAsync(ErrorMessage);
+            }
+            return nombreDeCola;
+
+
+        }
+        #endregion
+
+        #region Obtener numeros de telefeno
+        public async Task<string> GetNumeroTelefono(AnalyticsConversationWithoutAttributes conversation,string direccionOrigen)
+        {
+            string ? numeroTelefono = string.Empty;
+
             if (conversation?.Participants == null || !conversation.Participants.Any())
                 return await Task.FromResult(string.Empty);
 
-            var numeroTelefono = conversation.Participants
-                .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
-                .Where(p => p.Sessions?.Any() == true)
-                .SelectMany(p => p.Sessions)
-                .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
-                .Where(s => !string.IsNullOrWhiteSpace(s.Dnis))
-                .Select(s => ReemplazarTelefonoxVacio(s.Dnis))
-                .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+            if(direccionOrigen== "INBOUND")
+            {
+                // Obtener el número de teléfono del participante con propósito "Customer"
+                numeroTelefono = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Customer)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Ani))
+                    .Select(s => ReemplazarTelefonoxVacio(s.Ani))
+                    .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+            }
+            else if (direccionOrigen == "OUTBOUND")
+            {
+                // Obtener el número de teléfono del participante con propósito "Agent"
+                numeroTelefono = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipantWithoutAttributes.PurposeEnum.Agent)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Dnis))
+                    .Select(s => ReemplazarTelefonoxVacio(s.Dnis))
+                    .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+            }
+
+
+            return await Task.FromResult(numeroTelefono ?? string.Empty);
+        }
+        #endregion
+
+        #region Obtener numeros de telefeno de 60 días a más
+        public async Task<string> GetNumeroTelefono60DiasMas(AnalyticsConversation conversation, string direccionOrigen)
+        {
+            string? numeroTelefono = string.Empty;
+
+            if (conversation?.Participants == null || !conversation.Participants.Any())
+                return await Task.FromResult(string.Empty);
+
+            if (direccionOrigen == "INBOUND")
+            {
+                // Obtener el número de teléfono del participante con propósito "Customer"
+                numeroTelefono = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipant.PurposeEnum.Customer)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Ani))
+                    .Select(s => ReemplazarTelefonoxVacio(s.Ani))
+                    .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+            }
+            else if (direccionOrigen == "OUTBOUND")
+            {
+                // Obtener el número de teléfono del participante con propósito "Agent"
+                numeroTelefono = conversation.Participants
+                    .Where(p => p.Purpose == AnalyticsParticipant.PurposeEnum.Agent)
+                    .Where(p => p.Sessions?.Any() == true)
+                    .SelectMany(p => p.Sessions)
+                    .Where(s => s.MediaType == AnalyticsSession.MediaTypeEnum.Voice)
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Dnis))
+                    .Select(s => ReemplazarTelefonoxVacio(s.Dnis))
+                    .FirstOrDefault(tel => !string.IsNullOrWhiteSpace(tel));
+            }
+
 
             return await Task.FromResult(numeroTelefono ?? string.Empty);
         }
@@ -1489,10 +1778,317 @@ namespace Grabaciones.Services.Econtact
                                                 .Where(p => p.Attributes?.Any() == true)
                                                 .SelectMany(p => p.Attributes)
                                                 .Where(a => a.Key.Equals("wsAgenteDni", StringComparison.OrdinalIgnoreCase))
-                                                .FirstOrDefault().Value?.ToString() ?? "NNNNNNNN";
+                                                .FirstOrDefault().Value?.ToString() ?? "";
+
+            // Completar con ceros a la izquierda si es menor a 8 dígitos
+            dniAsesor = dniAsesor.PadLeft(8, '0');
+
+            if (string.IsNullOrEmpty(dniAsesor) || dniAsesor == "N")
+            {
+                dniAsesor= "NNNNNNNN"; // Asignar un valor por defecto si el DNI es nulo o vacío
+            }
 
             return await Task.FromResult(dniAsesor ?? "NNNNNNNN");
         }
         #endregion
+
+        #region Obtener numero de dni del asesor
+        public async Task<string> GetDNIAsesor60DiasMas(List<AnalyticsParticipant> participants)
+        {
+            if (participants == null || !participants.Any())
+                return await Task.FromResult("NNNNNNNN");
+
+            var dniAsesor = participants
+                            .Where(p => p.Attributes?.Any() == true)
+                            .SelectMany(p => p.Attributes)
+                            .Where(a => a.Key.Equals("wsAgenteDni", StringComparison.OrdinalIgnoreCase))
+                            .FirstOrDefault().Value?.ToString() ?? "";
+
+            // Completar con ceros a la izquierda si es menor a 8 dígitos
+            dniAsesor = dniAsesor.PadLeft(8, '0');
+
+            if (string.IsNullOrEmpty(dniAsesor) || dniAsesor == "N")
+            {
+                dniAsesor = "NNNNNNNN"; // Asignar un valor por defecto si el DNI es nulo o vacío
+            }
+
+            return await Task.FromResult(dniAsesor ?? "NNNNNNNN");
+        }
+        #endregion
+
+        #region Creacion y poblado de XML
+        public async Task CreateUpdateXMLGC(List<XmlGrabaciones> listMetadata)
+        {
+            string fechaCreacionXML = System.DateTime.Now.AddDays(-1).ToString("yyyyMMddHHmmss");
+            
+
+            var settings = new XmlWriterSettings
+            {
+                Async = true,
+                Indent = true,
+                Encoding = Encoding.UTF8
+            };
+
+            try
+            {
+                
+                var grabacionesCampaignQueue = listMetadata
+                .Where(m => !string.IsNullOrEmpty(m.p_nameCampaignCola))
+                .GroupBy(m => m.p_nameCampaignCola);
+
+                foreach(var groupMetadata in grabacionesCampaignQueue)
+                {
+                    int vn = groupMetadata.Count();
+                    // Obtiene la ruta de audio del primer registro del grupo
+                    string rutaBase = groupMetadata.FirstOrDefault()?.xmlRutadeAudio ?? "";
+                    string ArchivoXML = $"{rutaBase}/Resultado_{fechaCreacionXML}.xml";
+
+                    using (var stream = new FileStream(ArchivoXML, FileMode.Create, FileAccess.Write, FileShare.None))
+                    using (var writer = XmlWriter.Create(stream, settings))
+                    {
+                        await writer.WriteStartDocumentAsync();
+                        await writer.WriteStartElementAsync(null, "Registros", null);
+                        await writer.WriteAttributeStringAsync("xmlns", "xsi", null, "http://www.w3.org/2001/XMLSchema-instance");
+                        foreach (var iMetadata in groupMetadata)
+                        {
+                            if (iMetadata.xmlUrlGCAudio == "NoExisteUri")
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"No existe audio para la grabacion: {iMetadata.xmlRecordingID}| conversationID: {iMetadata.conversationID}");
+                                continue;
+                            }
+                            else
+                            {
+                                writer.WriteStartElement("Llamada");
+
+                                await EscribirElementoAsync(writer, "Empresa", iMetadata.p_empresa);
+                                await EscribirElementoAsync(writer, "DNICliente", iMetadata.p_dNICliente);
+                                await EscribirElementoAsync(writer, "ApellidoPaterno", iMetadata.p_apellidoPaterno);
+                                await EscribirElementoAsync(writer, "ApellidoMaterno", iMetadata.p_apellidoMaterno);
+                                await EscribirElementoAsync(writer, "Nombres", iMetadata.p_nombres);
+                                await EscribirElementoAsync(writer, "Telefono", iMetadata.p_telefono);
+                                await EscribirElementoAsync(writer, "FechaDeServicio", iMetadata.p_fechaDeServicio);
+                                await EscribirElementoAsync(writer, "HoraDeServicio", iMetadata.p_horaDeServicio);
+                                await EscribirElementoAsync(writer, "NroAsesor", iMetadata.p_NroAsesor);
+                                await EscribirElementoAsync(writer, "Proceso", iMetadata.p_Proceso);
+                                await EscribirElementoAsync(writer, "Vdn", iMetadata.p_vdn);
+                                await EscribirElementoAsync(writer, "Skill", iMetadata.p_skill);
+                                await EscribirElementoAsync(writer, "Ramo", iMetadata.p_ramo);
+                                await EscribirElementoAsync(writer, "Producto", iMetadata.p_producto);
+                                await EscribirElementoAsync(writer, "Resultado", iMetadata.p_resultado);
+                                await EscribirElementoAsync(writer, "Subresultado", iMetadata.p_subResultado);
+
+                                writer.WriteEndElement(); // Cierra el elemento "Llamada"
+
+                            }
+                        }
+                        await writer.WriteEndElementAsync(); // Registros
+                        await writer.WriteEndDocumentAsync();
+                        await writer.FlushAsync();
+                    }
+                    await EC_EscribirLog.EscribirLogAsync($"Archivo XML creado correctamente: {ArchivoXML}");
+                }
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al crear el archivo XML | Mensaje: {ex.Message}");
+                throw;
+            }
+        }
+
+        private static async Task EscribirElementoAsync(XmlWriter writer, string nombreElemento, string valor)
+        {
+            await writer.WriteStartElementAsync(null, nombreElemento, null);
+            await writer.WriteStringAsync(valor ?? string.Empty);
+            await writer.WriteEndElementAsync();
+        }
+        #endregion
+
+        #region Obtener campos para apis de pacifico
+        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation)
+        {
+            EC_ParametrosApiPacifico parametros = new EC_ParametrosApiPacifico();
+
+            try
+            {
+                if (callConversation?.Participants == null || !callConversation.Participants.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync("No se encontraron participantes en la conversación");
+                    return parametros;
+                }
+                else
+                {
+                    // Buscar participante con atributos (generalmente el agente)
+                    var participanteConAtributos = callConversation?.Participants?
+                    .FirstOrDefault(p => p.Attributes?.Any() == true);
+
+                    if (participanteConAtributos == null)
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("No se encontró participante con atributos");
+                        return parametros;
+                    }
+
+                    var attributes = participanteConAtributos.Attributes;
+                    //Se obtienen los datos de los atributos
+                    parametros = new EC_ParametrosApiPacifico
+                    {
+                        dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
+                        id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
+                       // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
+                    };
+                }
+
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al obtener parámetros de Pacifico: {ex.Message}");
+            }
+
+            return parametros;
+        }
+        #endregion
+
+        #region Obtener campos para apis de pacifico de 60 días a mas
+        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(List<AnalyticsParticipant> Participants)
+        {
+            EC_ParametrosApiPacifico parametros = new EC_ParametrosApiPacifico();
+
+            try
+            {
+                if (Participants == null || !Participants.Any())
+                {
+                    await EC_EscribirLog.EscribirLogAsync("No se encontraron participantes en la conversación");
+                    return parametros;
+                }
+                else
+                {
+                    // Buscar participante con atributos (generalmente el agente)
+                    var participanteConAtributos = Participants?
+                    .FirstOrDefault(p => p.Attributes?.Any() == true);
+
+                    if (participanteConAtributos == null)
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("No se encontró participante con atributos");
+                        return parametros;
+                    }
+
+                    var attributes = participanteConAtributos.Attributes;
+                    //Se obtienen los datos de los atributos
+                    parametros = new EC_ParametrosApiPacifico
+                    {
+                        dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
+                        id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
+                        // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
+                    };
+                }
+
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al obtener parámetros de Pacifico: {ex.Message}");
+            }
+
+            return parametros;
+        }
+        #endregion
+
+        #region Obtener metadata desde la api de pacifico -- se usa el api de finaliza llamada
+        public async Task<List<EC_Metadata>> PostMetadataPacifico()
+        {
+            string token = await ObtenerTokenPacifico();
+            List<EC_Metadata> metadatapacifico = new List<EC_Metadata>();
+            try
+            {
+                if (string.IsNullOrEmpty(token))
+                {
+                    await EC_EscribirLog.EscribirLogAsync("Token de Pacifico no obtenido, no se puede continuar.");
+                    return metadatapacifico;
+                }
+                // Aquí deberías implementar la lógica para obtener los metadatos de Pacifico
+                // Por ejemplo, podrías hacer una solicitud HTTP a la API de Pacifico para obtener los metadatos
+                // metadatapacifico = await ObtenerMetadatosDesdeApiPacifico(token);
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al obtener los metadatos de Pacifico: {ex.Message}");
+            }
+
+            return metadatapacifico;
+        }
+        #endregion
+
+        #region Obtener Token de pacifico
+        public async Task<string> ObtenerTokenPacifico()
+        {
+            string token = string.Empty;
+            try
+            {
+                // Aquí deberías implementar la lógica para obtener el token de Pacifico
+                // Por ejemplo, podrías hacer una solicitud HTTP a la API de Pacifico para obtener el token
+                // token = await ObtenerTokenDesdeApiPacifico();
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al obtener el token de Pacifico: {ex.Message}");
+            }
+            return token;
+        }
+        #endregion
+
+        #region Metodo para restaurar grabaciones desde genesys cloud
+        public async Task<bool> RestaurarGrabacionesGenesysCloud(string conversationId, string recordingId, string rutaDestino)
+        {
+            bool respuesta = false;
+            try
+            {
+                // Aquí deberías implementar la lógica para restaurar las grabaciones desde Genesys Cloud
+                // Por ejemplo, podrías hacer una solicitud HTTP a la API de Genesys Cloud para restaurar la grabación
+                // respuesta = await RestaurarGrabacionDesdeApiGenesysCloud(conversationId, recordingId, rutaDestino);
+                Recording recordingResult = new Recording();
+
+                var apiInstance = new RecordingApi();
+                var vConversationId = conversationId;  // string | Conversation ID
+                var vRecordingId = recordingId;  // string | Recording ID
+                var body = new Recording(); // Recording | recording
+
+                //body.ArchiveDate = DateTime.Now; // Establecer la fecha de archivo a la fecha actual
+                bool clearExport = true;
+
+                //Recording result = apiInstance.PutConversationRecording(conversationId, recordingId, body, clearExport);
+
+                recordingResult = await apiInstance.PutConversationRecordingAsync(vConversationId, vRecordingId, body, clearExport);
+
+                #region
+
+                if (recordingResult == null || recordingResult.FileState == Recording.FileStateEnum.Error)
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"No se pudo restaurar la grabación con ID: {recordingId}");
+                    return false;
+                }
+                else
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Se envía a restaurar la grabación con conversationId : {vConversationId} y recordingID: {recordingId} ");
+                    while (recordingResult.FileState == Recording.FileStateEnum.Restoring)
+                    {
+                        Thread.Sleep(1000); // Esperar 1 segundo antes de volver a consultar el estado-
+                    }
+                }
+                #endregion
+
+
+            }
+            catch (ApiException aEx)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al restaurar grabación desde Genesys Cloud:{aEx.ErrorCode} |  {aEx.Message}");
+                respuesta = false;
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al restaurar grabación desde Genesys Cloud: {ex.Message}");
+                respuesta = false;
+            }
+            return respuesta;
+        }
+        #endregion
+
     }
 }
