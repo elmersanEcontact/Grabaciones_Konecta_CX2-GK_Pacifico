@@ -591,9 +591,9 @@ namespace Grabaciones.Services.Econtact
         public async Task EnviarCorreo(string asunto, string nombresemana)
         {
 
-            EC_SmtpSettings _smtpSettings = _config.GetSection("SendEmailSettings").Get<EC_SmtpSettings>();
+            EC_SmtpSettings ? _smtpSettings = _config.GetSection("SendEmailSettings").Get<EC_SmtpSettings>();
 
-            string? _server = _smtpSettings.Server;
+            string ?_server = _smtpSettings.Server;
             int _port = _smtpSettings.Port;
 
             MailMessage _message = new MailMessage();
@@ -1151,17 +1151,17 @@ namespace Grabaciones.Services.Econtact
                 try
                 {
                     sftp.Connect();
-                    EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
+                   await  EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
 
                     // Verificar si el directorio remoto existe
                     if (!sftp.Exists(remoteDirectory))
                     {
                         sftp.CreateDirectory(remoteDirectory);
-                        EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
+                        await EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
                     }
                     else
                     {
-                        EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
+                        await EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
                     }
 
                     string fileName = System.IO.Path.GetFileName(archivo);
@@ -1170,18 +1170,18 @@ namespace Grabaciones.Services.Econtact
                     // Verificar si el archivo ya existe en el directorio remoto
                     if (sftp.Exists(remoteFilePath))
                     {
-                        EC_EscribirLog.EscribirLogAsync($"El archivo '{fileName}' ya existe en el directorio remoto, se omite su subida.");
+                        await EC_EscribirLog.EscribirLogAsync($"El archivo '{fileName}' ya existe en el directorio remoto, se omite su subida.");
                     }
                     else
                     {
                         // Subir el archivo
-                        await Task.Run(() =>
+                        await Task.Run(async () =>
                         {
                             using (var fileStream = new FileStream(archivo, FileMode.Open))
                             {
 
                                 sftp.UploadFile(fileStream, remoteFilePath);
-                                EC_EscribirLog.EscribirLogAsync($"Archivo '{fileName}' subido correctamente.");
+                                await EC_EscribirLog.EscribirLogAsync($"Archivo '{fileName}' subido correctamente.");
                                 respuesta = true;
                             }
                         });
@@ -1190,7 +1190,7 @@ namespace Grabaciones.Services.Econtact
                 }
                 catch (Exception ex)
                 {
-                    EC_EscribirLog.EscribirLogAsync($"Error al cargar achivo al sftp pacifico: {ex.Message}");
+                    await EC_EscribirLog.EscribirLogAsync($"Error al cargar achivo al sftp pacifico: {ex.Message}");
                     respuesta = false;
                 }
                 finally
@@ -1910,31 +1910,30 @@ namespace Grabaciones.Services.Econtact
 
             try
             {
-                if (callConversation?.Participants == null || !callConversation.Participants.Any())
+
+
+                #region primero obtener el valor de wsIG_Id  de los participantes de la conversación
+            string wsIG_Id = callConversation?.Participants?
+                .Where(p => p.Attributes?.Any() == true)
+                .SelectMany(p => p.Attributes)
+                .Where(a => a.Key.Equals("wsIG_Id", StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault().Value?.ToString() ?? string.Empty;
+            #endregion
+
+                if(string.IsNullOrEmpty(wsIG_Id))
                 {
-                    await EC_EscribirLog.EscribirLogAsync("No se encontraron participantes en la conversación");
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontró el atributo wsIG_Id en los participantes de la conversación: {callConversation.Id}");
                     return parametros;
                 }
                 else
                 {
-                    // Buscar participante con atributos (generalmente el agente)
-                    var participanteConAtributos = callConversation?.Participants?
-                    .FirstOrDefault(p => p.Attributes?.Any() == true);
+                    // Si se encontró wsIG_Id, asignarlo a los parámetros
+                    await EC_EscribirLog.EscribirLogAsync($"Se encontró el atributo wsIG_Id en los participantes de la conversación: {callConversation.Id} con el valor {wsIG_Id}");
 
-                    if (participanteConAtributos == null)
-                    {
-                        await EC_EscribirLog.EscribirLogAsync("No se encontró participante con atributos");
-                        return parametros;
-                    }
+                    #region Obtener valores
+                    parametros = await GetDatosPacificoAsync(wsIG_Id);
+                    #endregion
 
-                    var attributes = participanteConAtributos.Attributes;
-                    //Se obtienen los datos de los atributos
-                    parametros = new EC_ParametrosApiPacifico
-                    {
-                        dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
-                        id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
-                       // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
-                    };
                 }
 
             }
@@ -1942,6 +1941,7 @@ namespace Grabaciones.Services.Econtact
             {
                 await EC_EscribirLog.EscribirLogAsync($"Error al obtener parámetros de Pacifico: {ex.Message}");
             }
+               
 
             return parametros;
         }
@@ -1973,12 +1973,12 @@ namespace Grabaciones.Services.Econtact
 
                     var attributes = participanteConAtributos.Attributes;
                     //Se obtienen los datos de los atributos
-                    parametros = new EC_ParametrosApiPacifico
-                    {
-                        dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
-                        id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
-                        // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
-                    };
+                    //parametros = new EC_ParametrosApiPacifico
+                    //{
+                    //    dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
+                    //    id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
+                    //    // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
+                    //};
                 }
 
             }
@@ -2013,24 +2013,6 @@ namespace Grabaciones.Services.Econtact
             }
 
             return metadatapacifico;
-        }
-        #endregion
-
-        #region Obtener Token de pacifico
-        public async Task<string> ObtenerTokenPacifico()
-        {
-            string token = string.Empty;
-            try
-            {
-                // Aquí deberías implementar la lógica para obtener el token de Pacifico
-                // Por ejemplo, podrías hacer una solicitud HTTP a la API de Pacifico para obtener el token
-                // token = await ObtenerTokenDesdeApiPacifico();
-            }
-            catch (Exception ex)
-            {
-                await EC_EscribirLog.EscribirLogAsync($"Error al obtener el token de Pacifico: {ex.Message}");
-            }
-            return token;
         }
         #endregion
 
@@ -2087,6 +2069,165 @@ namespace Grabaciones.Services.Econtact
                 respuesta = false;
             }
             return respuesta;
+        }
+        #endregion
+
+
+        #region metodo para obtener el token de pacifico
+        public async Task<string> ObtenerTokenPacifico()
+        {
+            EC_TokenResponse tokenResponse = new EC_TokenResponse();
+
+            // Cargar configuración
+            EC_ConfiguracionApisPacfico ? vPacificoConfig;
+            var configList = _config.GetSection("ConfiguracionApisPacifico").Get<List<EC_ConfiguracionApisPacfico>>();
+            vPacificoConfig = configList?.FirstOrDefault();
+
+
+            string ? url = vPacificoConfig.Token.Url;
+            string? Ocp_Apim_Subscription_Key = vPacificoConfig.Token.OcpApimSubscriptionKey;
+            string? clientcredential = vPacificoConfig.Token.ClientCredential;
+            string? resource = vPacificoConfig.Token.Resource;
+
+            try
+            {
+            
+            //se prepara la variable para obtener el token
+            var tokenRequest = new HttpRequestMessage(HttpMethod.Post, url);
+
+            // Agregar headers requeridos
+            if (!string.IsNullOrWhiteSpace(Ocp_Apim_Subscription_Key))
+            {
+                tokenRequest.Headers.Add("Ocp-Apim-Subscription-Key", Ocp_Apim_Subscription_Key);
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientcredential))
+            {
+                tokenRequest.Headers.Add("ClientCredential", clientcredential);
+            }
+
+            // Agregar Content-Type y Accept
+            tokenRequest.Headers.Add("Accept", "application/json");
+
+
+            // Crear el body específico que requiere la API
+            var tokenBody = new
+            {
+                resource = resource
+            };
+
+            var jsonBody = JsonConvert.SerializeObject(tokenBody);
+            tokenRequest.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+            await EC_EscribirLog.EscribirLogAsync($"Solicitando token con resource: {tokenBody.resource}");
+            await EC_EscribirLog.EscribirLogAsync($"Headers: Ocp-Apim-Subscription-Key: {Ocp_Apim_Subscription_Key?.Substring(0, 8)}..., ClientCredential: {clientcredential?.Substring(0, 8)}...");
+
+            var response = await _httpClient.SendAsync(tokenRequest);
+
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                     tokenResponse = JsonConvert.DeserializeObject<EC_TokenResponse>(content);
+
+                    await EC_EscribirLog.EscribirLogAsync("Token generado exitosamente");
+                    await EC_EscribirLog.EscribirLogAsync($"Token type: {tokenResponse.TokenType}");
+                    await EC_EscribirLog.EscribirLogAsync($"Expires in: {tokenResponse.ExpiresIn} segundos");
+
+                    return tokenResponse.AccessToken;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    await EC_EscribirLog.EscribirLogAsync($"Error generando token de pacifico: {response.StatusCode} - {errorContent}");
+                    return "";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Se tuvo un error al generar token de pacifico: {ex.Message}");
+                throw;
+            }
+        }
+        #endregion
+
+        #region Metodo para obtener los datos desde la api de pacifico
+        public async Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId)
+        {
+            //variable a devolver
+            EC_ParametrosApiPacifico vParametrosPacifico = new EC_ParametrosApiPacifico();
+
+            // Cargar configuración
+            EC_ConfiguracionApisPacfico? vPacificoConfig;
+            var configList = _config.GetSection("ConfiguracionApisPacifico").Get<List<EC_ConfiguracionApisPacfico>>();
+            vPacificoConfig = configList?.FirstOrDefault();
+
+            try
+            {
+                await EC_EscribirLog.EscribirLogAsync($"🔄 Iniciando proceso para wsGcId: {wsGcId}");
+
+                // 1. Generar token
+                var token = await ObtenerTokenPacifico();
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    await EC_EscribirLog.EscribirLogAsync("❌ No se pudo obtener token");
+                    return null;
+                }
+
+                // 2. Hacer PATCH request con todos los headers
+                var url = $"{vPacificoConfig.ObtenerDatos.UrlDatos}{wsGcId}";
+                var request = new HttpRequestMessage(HttpMethod.Patch, url);
+
+                // Headers obligatorios
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                request.Headers.Add("Ocp-Apim-Subscription-Key", vPacificoConfig.ObtenerDatos.OcpApimSubscriptionKey);
+                request.Headers.Add("Accept", "application/json");
+
+                await EC_EscribirLog.EscribirLogAsync($"🔄 PATCH request a: {url}");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    dynamic data = JsonConvert.DeserializeObject(content);
+
+                    // Extraer campos específicos
+                    string tNumDoc_c = data?.tNumDoc_c?.ToString() ?? "NNN";
+                    string tPerApellidoPaterno_c = data?.tPerApellidoPaterno_c?.ToString() ?? "NNN";
+                    string tPerApellidoMaterno_c = data?.tPerApellidoMaterno_c?.ToString() ?? "NNN";
+                    string tPerNombre_c = data?.tPerNombre_c?.ToString() ?? "NNN";
+                    string producto = data?.chOptyTipifProducto_c?.ToString() ?? "NNN";
+                    string subresultado = data?.tOptyTipifSubResultado_c?.ToString() ?? "NNN";
+                    string tVDN_c = data?.tVDN_c?.ToString() ?? "NNN";
+
+                    await EC_EscribirLog.EscribirLogAsync($"✅ Producto: '{producto}', SubResultado: '{subresultado}'");
+
+                    return vParametrosPacifico = new EC_ParametrosApiPacifico
+                    {
+                        tNumDoc_c = tNumDoc_c,
+                        tPerApellidoPaterno_c = tPerApellidoPaterno_c,
+                        tPerApellidoMaterno_c = tPerApellidoMaterno_c,
+                        tPerNombre_c = tPerNombre_c,
+                        chOptyTipifProducto_c = producto,
+                        tOptyTipifSubResultado_c = subresultado,
+                        tVDN_c = tVDN_c,
+                    };
+    
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico:  {response.StatusCode}: {error}");
+                    return vParametrosPacifico;
+                }
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico| Excepción: {ex.Message}");
+                return vParametrosPacifico;
+            }
         }
         #endregion
 

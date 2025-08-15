@@ -19,6 +19,7 @@
     <PackageReference Include="FluentFTP" Version="50.1.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
     <PackageReference Include="Microsoft.Office.Interop.Excel" Version="15.0.4795.1001" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Polly" Version="8.5.2" />
     <PackageReference Include="PureCloudPlatform.Client.V2" Version="205.0.0" />
     <PackageReference Include="Renci.SshNet.Async" Version="1.4.0" />

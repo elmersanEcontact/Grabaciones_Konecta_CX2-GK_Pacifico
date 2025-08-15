@@ -113,7 +113,8 @@ namespace Grabaciones.Services.Repositorio
             #endregion
 
             #region Obtener las campañas por division
-            List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
+            List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            //List<EC_Campaign> GC_Campaigns = await SGC_Campaign.GetCampaing(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
             #endregion
 
             #region Obtener Wrapupcode(Tipificaciones)  -- validar cuando falle el método
@@ -502,20 +503,24 @@ namespace Grabaciones.Services.Repositorio
 
                     metadataPacifico = await _ecMetodos.ObtenerParametroPacifico(callConversation);
 
-                    #region Resultados desde api de pacifico
-                        xmlDniCliente = "xmlDniCliente";
-                        xmlApellidoPaterno = "xmlApellidoPaterno";
-                        xmlApellidoMaterno = "xmlApellidoMaterno";
-                        xmlNombres = "xmlNombres";
+                //metadataPacifico = await _ecMetodos.ObtenerParametroPacifico(callConversation);
+
+                
+
+                #region Resultados desde api de pacifico
+                        xmlDniCliente = metadataPacifico.tNumDoc_c;
+                        xmlApellidoPaterno = metadataPacifico.tPerApellidoPaterno_c;
+                        xmlApellidoMaterno = metadataPacifico.tPerApellidoMaterno_c;
+                        xmlNombres = metadataPacifico.tPerNombre_c;
                         xmlTelefono = phoneNumber;
                         xmlNumeroAsesor = dniAsesor;
-                        xmlProceso = "xmlProceso";
-                        xmlVdn = "xmlVdn";
-                        xmlSkill = "xmlSkill";
-                        xmlRamo = "xmlRamo";
-                        xmlProducto = "xmlProducto";
-                        xmlResultado = "xmlResultado";
-                        xmlSubResultado = "xmlSubResultado";
+                        xmlProceso = "NNN";
+                        xmlVdn = metadataPacifico.tVDN_c;
+                        xmlSkill = "NNN";
+                        xmlRamo = metadataPacifico.chOptyTipifProducto_c;
+                        xmlProducto = metadataPacifico.chOptyTipifProducto_c;
+                        xmlResultado = metadataPacifico.chOptyTipifProducto_c;
+                        xmlSubResultado = metadataPacifico.chOptyTipifProducto_c;
                     #endregion
 
 
@@ -575,7 +580,7 @@ namespace Grabaciones.Services.Repositorio
                     {
                         DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
                         await EC_EscribirLog.EscribirLogAsync($"Grabacion no disponible: {iRecording.ConversationId} - grabacion: {iRecording.Id}");
-                        continue;
+                        //continue;
                     }
 
                     //DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);

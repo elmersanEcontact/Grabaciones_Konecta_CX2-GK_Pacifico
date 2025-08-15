@@ -1,0 +1,12 @@
+******************      Log   20250815       ******************
+15/08/2025 00:05:11 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 00:08:34 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 00:28:23 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 00:30:12 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 00:35:46 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 00:37:17 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 10:09:17 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 10:12:18 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 10:17:37 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 10:19:57 ==>  La descarga es para el metodo menor a 60 días
+15/08/2025 10:22:33 ==>  La descarga es para el metodo menor a 60 días

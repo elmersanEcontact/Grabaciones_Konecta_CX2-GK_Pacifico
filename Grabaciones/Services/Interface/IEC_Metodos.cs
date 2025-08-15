@@ -62,5 +62,7 @@ namespace Grabaciones.Services.Interface
 
        // Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
         Task<bool> SubirArchivosSFTPKonecta(string archivo, string periodo);
+
+        Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId);
     }
 }
