@@ -464,23 +464,23 @@ namespace Grabaciones.Services.GenesysCloud
                      }
                  },
 
-                new ConversationDetailQueryFilter
-                {
-                    Type = ConversationDetailQueryFilter.TypeEnum.And,
-                    Predicates = new List<ConversationDetailQueryPredicate>()
-                    {
-                        new ConversationDetailQueryPredicate()
-                        {
-                            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
-                            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
-                            //outbound
-                            Value = "bbbb80f3-a3c3-49e6-8551-54d75eb20f5c"
+                //new ConversationDetailQueryFilter
+                //{
+                //    Type = ConversationDetailQueryFilter.TypeEnum.And,
+                //    Predicates = new List<ConversationDetailQueryPredicate>()
+                //    {
+                //        new ConversationDetailQueryPredicate()
+                //        {
+                //            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
+                //            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
+                //            //outbound
+                //            Value = "bbbb80f3-a3c3-49e6-8551-54d75eb20f5c"
 
-                            //inbound
-                            //Value = "182918ee-932e-4291-9604-99edc02bcbb0"
-                        }
-                    }
-                }
+                //            //inbound
+                //            //Value = "182918ee-932e-4291-9604-99edc02bcbb0"
+                //        }
+                //    }
+                //},
 
             };
 

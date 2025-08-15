@@ -1134,7 +1134,7 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Subir a SFTP de Konecta
-        public async Task<bool> SubirArchivosSFTPKonecta(string archivo, string periodo)
+        public async Task<bool> SubirArchivosSFTPKonecta(string archivo, string directorioFTP)
         {
             await EC_EscribirLog.EscribirLogAsync($"Subir archivo a sftp de konect: {archivo}");
             bool respuesta = false;
@@ -1143,7 +1143,7 @@ namespace Grabaciones.Services.Econtact
             string passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
             int puertoFTP = _config.GetValue<int>("SFTPConfiguration:puertoFTP");
             string privateKeyFilePath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
-            string remoteDirectory = $"{_config.GetValue<string>("SFTPConfiguration:remoteDirectory")}/{periodo}";
+            string remoteDirectory = directorioFTP;
 
             #region metodo para cargar archivos a SFTP de Konecta-pacifico
             using (var sftp = new SftpClient(host, puertoFTP, username, passFTP))
@@ -1153,16 +1153,19 @@ namespace Grabaciones.Services.Econtact
                     sftp.Connect();
                    await  EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
 
-                    // Verificar si el directorio remoto existe
-                    if (!sftp.Exists(remoteDirectory))
-                    {
-                        sftp.CreateDirectory(remoteDirectory);
-                        await EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
-                    }
-                    else
-                    {
-                        await EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
-                    }
+                    // ✅ Crear directorios recursivamente
+                    await CreateDirectoryRecursivelyAsync(sftp, remoteDirectory);
+
+                    ////// Verificar si el directorio remoto existe
+                    ////if (!sftp.Exists(remoteDirectory))
+                    ////{
+                    ////    sftp.CreateDirectory(remoteDirectory);
+                    ////    await EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
+                    ////}
+                    ////else
+                    ////{
+                    ////    await EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
+                    ////}
 
                     string fileName = System.IO.Path.GetFileName(archivo);
                     string remoteFilePath = $"{remoteDirectory}/{fileName}";
@@ -1207,7 +1210,62 @@ namespace Grabaciones.Services.Econtact
             return respuesta;
         }
         #endregion
-        
+
+        #region Creacion recursiva de directorios en SFTP
+        private async Task CreateDirectoryRecursivelyAsync(SftpClient sftp, string remotePath)
+        {
+            try
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Intentando crear directorio: {remotePath}");
+
+                // Normalizar la ruta (reemplazar \ por /)
+                remotePath = remotePath.Replace('\\', '/');
+
+                // Si la ruta ya existe, no hacer nada
+                if (sftp.Exists(remotePath))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"El directorio '{remotePath}' ya existe.");
+                    return;
+                }
+
+                // Dividir la ruta en partes
+                string[] pathParts = remotePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+                string currentPath = "";
+
+                foreach (string part in pathParts)
+                {
+                    currentPath += "/" + part;
+
+                    if (!sftp.Exists(currentPath))
+                    {
+                        try
+                        {
+                            sftp.CreateDirectory(currentPath);
+                            await EC_EscribirLog.EscribirLogAsync($"Directorio creado: {currentPath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"Error creando directorio '{currentPath}': {ex.Message}");
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        await EC_EscribirLog.EscribirLogAsync($"Directorio existente: {currentPath}");
+                    }
+                }
+
+                await EC_EscribirLog.EscribirLogAsync($"Estructura de directorios completa creada: {remotePath}");
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error en CreateDirectoryRecursively: {ex.Message}");
+                throw;
+            }
+        }
+        #endregion
+
 
         #region Metodo para guardar la información de metadata en Base de datos
         public async Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString)
@@ -1820,7 +1878,9 @@ namespace Grabaciones.Services.Econtact
         public async Task CreateUpdateXMLGC(List<XmlGrabaciones> listMetadata)
         {
             string fechaCreacionXML = System.DateTime.Now.AddDays(-1).ToString("yyyyMMddHHmmss");
-            
+            string eAnio = listMetadata[0].eAnio;
+            string eMes = listMetadata[0].eMes;
+
 
             var settings = new XmlWriterSettings
             {
@@ -1835,13 +1895,14 @@ namespace Grabaciones.Services.Econtact
                 var grabacionesCampaignQueue = listMetadata
                 .Where(m => !string.IsNullOrEmpty(m.p_nameCampaignCola))
                 .GroupBy(m => m.p_nameCampaignCola);
-
+                
                 foreach(var groupMetadata in grabacionesCampaignQueue)
                 {
                     int vn = groupMetadata.Count();
                     // Obtiene la ruta de audio del primer registro del grupo
                     string rutaBase = groupMetadata.FirstOrDefault()?.xmlRutadeAudio ?? "";
                     string ArchivoXML = $"{rutaBase}/Resultado_{fechaCreacionXML}.xml";
+                    string directorioFTP = groupMetadata.FirstOrDefault()?.xmldirectorioFTP ?? "";
 
                     using (var stream = new FileStream(ArchivoXML, FileMode.Create, FileAccess.Write, FileShare.None))
                     using (var writer = XmlWriter.Create(stream, settings))
@@ -1886,6 +1947,7 @@ namespace Grabaciones.Services.Econtact
                         await writer.FlushAsync();
                     }
                     await EC_EscribirLog.EscribirLogAsync($"Archivo XML creado correctamente: {ArchivoXML}");
+                    bool respuestaOkSFTKonecta = await SubirArchivosSFTPKonecta(ArchivoXML, directorioFTP);
                 }
             }
             catch (Exception ex)
@@ -1910,15 +1972,13 @@ namespace Grabaciones.Services.Econtact
 
             try
             {
-
-
                 #region primero obtener el valor de wsIG_Id  de los participantes de la conversación
-            string wsIG_Id = callConversation?.Participants?
-                .Where(p => p.Attributes?.Any() == true)
-                .SelectMany(p => p.Attributes)
-                .Where(a => a.Key.Equals("wsIG_Id", StringComparison.OrdinalIgnoreCase))
-                .FirstOrDefault().Value?.ToString() ?? string.Empty;
-            #endregion
+                string wsIG_Id = callConversation?.Participants?
+                    .Where(p => p.Attributes?.Any() == true)
+                    .SelectMany(p => p.Attributes)
+                    .Where(a => a.Key.Equals("wsIG_Id", StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault().Value?.ToString() ?? string.Empty;
+                #endregion
 
                 if(string.IsNullOrEmpty(wsIG_Id))
                 {
@@ -1931,7 +1991,7 @@ namespace Grabaciones.Services.Econtact
                     await EC_EscribirLog.EscribirLogAsync($"Se encontró el atributo wsIG_Id en los participantes de la conversación: {callConversation.Id} con el valor {wsIG_Id}");
 
                     #region Obtener valores
-                    parametros = await GetDatosPacificoAsync(wsIG_Id);
+                    parametros = await GetDatosPacificoAsync(wsIG_Id,callConversation.Id);
                     #endregion
 
                 }
@@ -2072,7 +2132,6 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-
         #region metodo para obtener el token de pacifico
         public async Task<string> ObtenerTokenPacifico()
         {
@@ -2153,7 +2212,7 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Metodo para obtener los datos desde la api de pacifico
-        public async Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId)
+        public async Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId, string conversationId)
         {
             //variable a devolver
             EC_ParametrosApiPacifico vParametrosPacifico = new EC_ParametrosApiPacifico();
@@ -2183,6 +2242,11 @@ namespace Grabaciones.Services.Econtact
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
                 request.Headers.Add("Ocp-Apim-Subscription-Key", vPacificoConfig.ObtenerDatos.OcpApimSubscriptionKey);
                 request.Headers.Add("Accept", "application/json");
+
+                // ✅ IMPORTANTE: Para PATCH, agregar body vacío o minimal
+                var emptyBody = "{}"; // Body JSON vacío
+                request.Content = new StringContent(emptyBody, Encoding.UTF8, "application/json");
+
 
                 await EC_EscribirLog.EscribirLogAsync($"🔄 PATCH request a: {url}");
 
@@ -2219,13 +2283,23 @@ namespace Grabaciones.Services.Econtact
                 else
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico:  {response.StatusCode}: {error}");
+                    await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}|:  {response.StatusCode}: {error}");
                     return vParametrosPacifico;
                 }
             }
+            catch (HttpRequestException httpex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción HTTP: {httpex.Message}");
+                return vParametrosPacifico;
+            }
+            catch(TaskCanceledException timeoutEx)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción de tiempo de espera: {timeoutEx.Message}");
+                return vParametrosPacifico;
+            }
             catch (Exception ex)
             {
-                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico| Excepción: {ex.Message}");
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción: {ex.Message}");
                 return vParametrosPacifico;
             }
         }

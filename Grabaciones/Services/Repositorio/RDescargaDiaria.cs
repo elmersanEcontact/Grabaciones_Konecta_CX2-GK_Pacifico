@@ -109,7 +109,8 @@ namespace Grabaciones.Services.Repositorio
 
             #region Obtener Colas
             //List<GC_Queue> GC_Queues = SGC_Queue.ObtenerColas();
-            List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
+            List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO")).Select(d => d.id).ToList());
+            //List<GC_Queue> GC_Queues = await SGC_Queue.ObtenerColasPorDivision(ListDivisions.Where(d => d.name.Equals("PACIFICO ECOMMERCE")).Select(d => d.id).ToList());
             #endregion
 
             #region Obtener las campañas por division
@@ -189,10 +190,10 @@ namespace Grabaciones.Services.Repositorio
                     {
                         await EC_EscribirLog.EscribirLogAsync($"Conversacion[{iConversacion}]");
 
-                        //////await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
+                        await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
 
-                        //////tasks.Add(Task.Run(async () =>
-                        //////{
+                        tasks.Add(Task.Run(async () =>
+                        {
                             try
                             {
                                 // ✅ Espera para cumplir 4 llamadas por segundo
@@ -219,9 +220,9 @@ namespace Grabaciones.Services.Repositorio
                             {
                                 throttler.Release(); // Liberar el semáforo
                             }
-                    //////}));
+                        }));
 
-                    iConversacion++;
+                        iConversacion++;
                     }
 
                     // Esperar a que todas las tareas terminen
@@ -433,7 +434,7 @@ namespace Grabaciones.Services.Repositorio
         )
         {
             string? xmlFormato = _config.GetValue<string>("ConfiguracionAudio:Formato");
-            string? xmlRutaFtp = string.Empty; //_config.GetValue<string>("ConfiguracionAudio:RutaFtp").Replace("\\",@"\");
+            string? xmlRutaFtp = _config.GetValue<string>("SFTPConfiguration:remoteDirectory");
             string? xmlEmpresa = _config.GetValue<string>("ConfiguracionAudio:Empresa");
             string? xmlOrganizacion = _config.GetValue<string>("ConfiguracionAudio:Organization");
 
@@ -688,7 +689,7 @@ namespace Grabaciones.Services.Repositorio
                     xmlGrabaciones.eHora = eHora;
 
                     xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
-                    xmlGrabaciones.xmldirectorioFTP = _directorioFTP.Replace("\\", @"\");
+                    xmlGrabaciones.xmldirectorioFTP = $"{xmlRutaFtp}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}"; 
                     xmlGrabaciones.xmlArchivolocal = _archivolocal;
 
                     //Datos para pacifico
@@ -733,7 +734,7 @@ namespace Grabaciones.Services.Repositorio
                         if (xmlGrabaciones.xmlAudioDescargado)
                         {
                             ////subir al repositorio de ftp
-                            bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, $"{xmlGrabaciones.eAnio}{xmlGrabaciones.eMes}");
+                            bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmldirectorioFTP);
                             if (respuestaOkSFTKonecta)
                             {
                                 await EC_EscribirLog.EscribirLogAsync($"Archivo subido correctamente al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
