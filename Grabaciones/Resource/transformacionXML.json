@@ -1,0 +1,122 @@
+{
+  "OUTBOUND": {
+       "chOptyTipifProducto_c": {
+         "AUTO_BANA": "Autos",
+         "AUTO_EC": "Autos",
+         "AUTO_IN": "Autos",
+         "AUTO_OUT": "Autos",
+         "HOGAR_EC": "Otros",
+         "HOGAR_IN": "Otros",
+         "ONCOLOGICO_EC": "Salud",
+         "ONCOLOGICO_IN": "Salud",
+         "PYME_EC": "Otros",
+         "SALUD_OUT": "Salud",
+         "SOAT_EC": "Autos",
+         "SOAT_IN": "Autos",
+         "VIAJES_EC": "Otros",
+         "VIAJES_IN": "Otros",
+         "VIB_EC": "Vida",
+         "VIDA_EC": "Vida",
+         "VIDA_IN": "Vida",
+         "VIDA_LEY_EC": "Vida",
+         "VIDA_OUT": "Vida",
+         "VIG_EC": "Vida",
+         "Vacíos o sin valor": "Otros"
+       },
+       "tOptyTipifSubResultado_c": {
+         "AGENDADO": "Contacto del asesor",
+         "NO CALIFICA": "Contacto del asesor",
+         "NO CONTACTO": "Contacto No Valido",
+         "NO INTERESADO": "Contacto del asesor",
+         "CONTACTO NO VÁLIDO": "Contacto No Valido",
+         "POST VENTA": "Transferencia",
+         "VENTA": "Venta",
+         "SHORT CALL": "Problema Tecnico",
+         "OTROS SEGUROS": "Derivacion a Pool Otros Seguros",
+         "RETENCIÓN": "Transferencia Retencion",
+         "Sin tipificación u otros valores": "Sin valor"
+       }
+   },
+  "INBOUND": {
+          "tSRLineaNegocio_c": {
+            "AUTOS": {
+              "ramo": "Autos",
+              "producto": "Autos"
+            },
+            "SOAT": {
+              "ramo": "Autos",
+              "producto": "Otros"
+            },
+            "ASISTENCIA MEDICA": {
+              "ramo": "Salud",
+              "producto": "Otros"
+            },
+            "SALUD": {
+              "ramo": "Salud",
+              "producto": "Otros"
+            },
+            "SCTR SALUD": {
+              "ramo": "Salud",
+              "producto": "Otros"
+            },
+            "ACCIDENTES PERSONALES": {
+              "ramo": "Vida",
+              "producto": "Accidentes Personales"
+            },
+            "LINEAS PERSONALES": {
+              "ramo": "Vida",
+              "producto": "Lineas Personales"
+            },
+            "RENTAS VITALICIAS": {
+              "ramo": "Vida",
+              "producto": "Otros"
+            },
+            "SEPELIO": {
+              "ramo": "Vida",
+              "producto": "Sepelio"
+            },
+            "VIDA GRUPO CORPORATIVO": {
+              "ramo": "Vida",
+              "producto": "Vida Grupo"
+            },
+            "VIDA INDIVIDUAL": {
+              "ramo": "Vida",
+              "producto": "Vida Individual"
+            },
+            "VIDA LEY": {
+              "ramo": "Vida",
+              "producto": "Otros"
+            },
+            "VIDA GRUPO": {
+              "ramo": "Vida",
+              "producto": "Vida Grupo"
+            },
+            "ACCIDENTES TRABAJO": {
+              "ramo": "Vida",
+              "producto": "Otros"
+            },
+            "OTROS": {
+              "ramo": "Otros",
+              "producto": "Otros"
+            },
+            "RRGG MAYORISTAS": {
+              "ramo": "Otros",
+              "producto": "Otros"
+            },
+            "Sin valor": {
+              "ramo": "Otros",
+              "producto": "Otros"
+            }
+          },
+          "tSRDisposicion_c": {
+            "REQUERIMIENTO": "Requerimiento",
+            "CONSULTA": "Consulta",
+            "TRANSFERENCIAS": "Transferencia",
+            "SINIESTROS": "Atencion de Siniestro",
+            "ASISTENCIA": "Contacto del asesor",
+            "CONTACTO NO VALIDO": "Contacto No Valido",
+            "RECLAMO": "Reclamo",
+            "Sin tipificación u otros valores": "Sin valor"
+          }
+        }
+}

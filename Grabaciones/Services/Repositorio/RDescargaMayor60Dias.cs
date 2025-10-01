@@ -17,6 +17,7 @@ namespace Grabaciones.Services.Repositorio
 
         private readonly IConfiguration _config;
         private readonly IEC_Metodos _ecMetodos;
+        public EC_ConfiguracionTransformacionXML configuracionTransformacionXML;
 
         public RDescargaMayor60Dias(IConfiguration configuration, IEC_Metodos ecMetodos)
         {
@@ -28,9 +29,6 @@ namespace Grabaciones.Services.Repositorio
         public async Task<ResponseRepositorio> DescargaMayor60Dias(DateTime FechaInicio, DateTime FechaFin)
         {
             EC_EscribirLog.EscribirLog("Se inicia proceso de descarga " + FechaInicio.ToString("yyyy-MM-dd HH:mm:ss") + " - " + FechaFin.ToString("yyyy-MM-dd HH:mm:ss"));
-
-            //string _xcadena = @"C:\\Users\\Administrator\\Documents\\directory-glacier-deep-archive\\KonectaPeruCx1\\RimacSoat\\KONECTA_SOAT_RIMAC_TELEMARKETING-Semana-3-julio\\16-07-2024_f6dd6305-e66b-4ac4-b5b8-f9e145ce9677_JORGE-ESTEBAN-URBINA-ZU?IGA_950303449.MP3";
-            //Console.WriteLine(_ecMetodos.EliminarCaracteresEspeciales(_xcadena));
 
             #region Traer el numero de la semana
             string vRespuestSemana =  await _ecMetodos.ObtenerNombreSemanaUltimoDia(FechaInicio);
@@ -72,7 +70,6 @@ namespace Grabaciones.Services.Repositorio
             RecordingApi recordingApi = new RecordingApi();
             #endregion
 
-
             #region Autenticacion -- validar cuando falle en el método
             try
             {
@@ -84,7 +81,6 @@ namespace Grabaciones.Services.Repositorio
                 throw;
             }
             #endregion
-
 
             #region Obtener Divisiones -- validar cuando falle el método
             List<GC_Division> ListDivisions = sGC_Division.ObtenerDivision();
@@ -118,6 +114,7 @@ namespace Grabaciones.Services.Repositorio
             #region bucle para descarga de audios
             List<XmlGrabaciones> listXmlGrabaciones = new List<XmlGrabaciones>();
             List<GC_ImprimirExcel> listImprimirExcel = new List<GC_ImprimirExcel>();
+            List<EC_Metadata> listMetadata = new List<EC_Metadata>();
 
             while (vFechaInicioIntervalo < vFechaFin)
             {
@@ -127,11 +124,11 @@ namespace Grabaciones.Services.Repositorio
                 List<AnalyticsConversation> conversationDetails = await GC_ConversationJobs.ObtenerDatosdelJobResult(FechaInicio, FechaFin, _config);
                 #endregion
 
+                #region Recorrido de cada una de las conversaciones
                 if (conversationDetails.Count == 0 || conversationDetails is null)
                 {
                     await EC_EscribirLog.EscribirLogAsync($"Las conversaciones para el rango: {rangoFechas} son: {conversationDetails?.Count().ToString()}");
                     Console.WriteLine("No hay registros a evaluar");
-                    
                 }
                 else
                 {
@@ -156,15 +153,13 @@ namespace Grabaciones.Services.Repositorio
                         await throttler.WaitAsync(); // Esperar si ya hay demasiadas tareas en ejecución
 
                         tasks.Add(Task.Run(async () =>
-                        {
-                            try
-                        {
-                                // ✅ Espera para cumplir 4 llamadas por segundo
-                                //await rateLimiter.WaitAsync();
+                       {
+                           try
+                            {
+                               
 
                                 await ProcesarConversaciones(conversation, listXmlGrabaciones,
                                                             listImprimirExcel,
-                                                            //PaisCola, 
                                                             vFechaInicioIntervalo, _directorioGrabaciones,
                                                             rateLimiter, iConversacion,
                                                             ListDivisions, GC_Queues, GC_Campaigns);
@@ -183,17 +178,103 @@ namespace Grabaciones.Services.Repositorio
                             {
                                 throttler.Release(); // Liberar el semáforo
                             }
-                        }));
-                        iConversacion++;
+                    }));
+                    iConversacion++;
 
                     }
+
+                    // Esperar a que todas las tareas terminen
+                    //await Task.WhenAll(tasks);
                 }
+                #endregion
 
                 EC_EscribirLog.EscribirLog($"Fin de la extracción de informacion de grabaciones para los días {vFechaInicioIntervalo} - {vFechaFinIntervalo}");
 
                 vFechaInicioIntervalo = vFechaInicioIntervalo.AddDays(1);
                 vFechaFinIntervalo = vFechaFinIntervalo.AddDays(1);
 
+            }
+            #endregion
+
+            #region crear lista para crear excel
+            await EC_EscribirLog.EscribirLogAsync($"Se descargaran un total de {listXmlGrabaciones.Count()} grabaciones en MP3");
+
+            if (listXmlGrabaciones != null && listXmlGrabaciones.Count() > 0)
+            {
+
+
+                #region Crear archivo xml
+                await _ecMetodos.CreateUpdateXMLGC(listXmlGrabaciones);
+                #endregion
+
+
+                foreach (var iGrabaciones in listXmlGrabaciones)
+                {
+                    if (iGrabaciones.xmlUrlGCAudio == "NoExisteUri")
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("No existe audio para la grabacion: " + iGrabaciones.xmlRecordingID);
+                    }
+                    else
+                    {
+
+                        listMetadata.Add(new EC_Metadata
+                        {
+
+                            empresa = iGrabaciones.xmlempresa,
+                            dNICliente = "dNICliente",
+                            apellidoPaterno = "apellidoPaterno",
+                            apellidoMaterno = "apellidoMaterno",
+                            nombres = "nombres",
+                            telefono = "telefono",
+                            fechaDeServicio = "fechaDeServicio",
+                            horaDeServicio = "horaDeServicio",
+                            NroAsesor = "NroAsesor",
+                            Proceso = "Proceso",
+                            vdn = "vdn",
+                            skill = "skill",
+                            ramo = "ramo",
+                            producto = "producto",
+                            resultado = "resultado",
+                            subResultado = "subResultado"
+
+                        });
+
+
+
+                        #region Subir archivo a FTP
+                        //if (respuestaAudio)
+                        //{
+                        //    try
+                        //    {
+
+                        //  var result = _ecMetodos.UploadFTPAudios(iGrabaciones.xmldirectorioFTP, iGrabaciones.xmlRutaCompletaAudioGSM, iGrabaciones.xmlArchivolocal);
+
+                        //    }
+                        //    catch (Exception ex)
+                        //    {
+                        //        await EC_EscribirLog.EscribirLogAsync($"Error en UploadFTPAudios: {ex.Message.ToString()}");
+                        //        throw;
+                        //    }
+                        //}
+                        #endregion
+
+                        #region subir a repositorio de amazon S3
+                        //if (respuestaAudio) {
+                        //    try
+                        //    {
+                        //     var resultS3 = _ecMetodos.SubirArchivosSFTAmazon(iGrabaciones.xmlRutaCompletaAudioGSM, _nombresemana, iGrabaciones.eAnio);
+                        //    }
+                        //    catch (Exception ex)
+                        //    {
+                        //        await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al S3 de Konecta: {ex.Message}");
+                        //        throw;
+                        //    }
+                        //}
+                        #endregion
+
+                    }
+                }
+               
             }
             #endregion
 
@@ -206,7 +287,6 @@ namespace Grabaciones.Services.Repositorio
             AnalyticsConversation conversation,
             List<XmlGrabaciones> listXmlGrabaciones,
             List<GC_ImprimirExcel> listImprimirExcel,
-            // List<EC_GruposPaisCola> PaisCola,
             DateTime vFechaInicioIntervalo,
             string DirectorioGrabaciones,
             SimpleRateLimiter rateLimiter, int iconversation,
@@ -282,22 +362,23 @@ namespace Grabaciones.Services.Repositorio
                 //Lista para obtener los campos al llamar la api de pacifico
                 EC_ParametrosApiPacifico metadataPacifico = new EC_ParametrosApiPacifico();
 
-                metadataPacifico = await _ecMetodos.ObtenerParametroPacifico60DiasMas(conversation.Participants);
+                 //metadataPacifico = await _ecMetodos.ObtenerParametroPacifico60DiasMas(conversation);
+                 metadataPacifico = await _ecMetodos.ObtenerParametroPacifico60DiasMas(conversation, configuracionTransformacionXML, direction);
 
                 #region Resultados desde api de pacifico
-                xmlDniCliente = "xmlDniCliente";
-                xmlApellidoPaterno = "xmlApellidoPaterno";
-                xmlApellidoMaterno = "xmlApellidoMaterno";
-                xmlNombres = "xmlNombres";
+                xmlDniCliente = metadataPacifico.tNumDoc_c;
+                xmlApellidoPaterno = metadataPacifico.tPerApellidoPaterno_c;
+                xmlApellidoMaterno = metadataPacifico.tPerApellidoMaterno_c;
+                xmlNombres = metadataPacifico.tPerNombre_c;
                 xmlTelefono = phoneNumber;
-                xmlNumeroAsesor = dniAsesor;
-                xmlProceso = "xmlProceso";
-                xmlVdn = "xmlVdn";
-                xmlSkill = "xmlSkill";
-                xmlRamo = "xmlRamo";
-                xmlProducto = "xmlProducto";
-                xmlResultado = "xmlResultado";
-                xmlSubResultado = "xmlSubResultado";
+                xmlNumeroAsesor = dniAsesor.Replace("N", "");
+                xmlProceso = direction.ToUpper() == "INBOUND" ? "IN" : "OUT";
+                xmlVdn = metadataPacifico.tVDN_c;
+                xmlSkill = metadataPacifico.skill;
+                xmlRamo = metadataPacifico.ramo;
+                xmlProducto = metadataPacifico.producto;
+                xmlResultado = metadataPacifico.result;
+                xmlSubResultado = metadataPacifico.subResu;
                 #endregion
 
 
@@ -347,7 +428,18 @@ namespace Grabaciones.Services.Repositorio
                 await EC_EscribirLog.EscribirLogAsync("Se extrae la información de las grabaciones de la conversación: " + iRecording.ConversationId + " y de la grabacion: " + iRecording.Id + " - con una duracion de " + nDiferenciaSegundos.ToString());
 
                 //obtener los datos dela grabacion en MP3
-                DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
+                if (iRecording.FileState == RecordingMetadata.FileStateEnum.Archived)
+                {
+
+                    await EC_EscribirLog.EscribirLogAsync($"Grabacion no  disponible: {iRecording.ConversationId} - grabacion: {iRecording.Id}");
+
+                }
+                else
+                {
+                    DatosMP3 = await SGC_ConversationRecording.ObtenerDatosGrabacionMP3(iRecording.ConversationId, iRecording.Id, _config, rateLimiter);
+                    await EC_EscribirLog.EscribirLogAsync($"Grabacion no disponible: {iRecording.ConversationId} - grabacion: {iRecording.Id}");
+                    //continue;
+                }
 
                 if (DatosMP3 is null)
                 {
@@ -390,7 +482,7 @@ namespace Grabaciones.Services.Repositorio
                 string _NombreAudioExcel = "";
                 string _urlAudio = "";
                 string _directorioAudio = string.Empty;
-                string _directorioFTP = "";
+                
                 string _archivolocal = "";
 
                 if (!DatosMP3.MediaUris.ContainsKey("S"))
@@ -453,18 +545,19 @@ namespace Grabaciones.Services.Repositorio
                 xmlGrabaciones.eHora = eHora;
 
                 xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
-                xmlGrabaciones.xmldirectorioFTP = _directorioFTP.Replace("\\", @"\");
+                xmlGrabaciones.xmldirectorioFTP = $"{xmlRutaFtp}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}";
+                xmlGrabaciones.xmldirectorioFTPxml = $"/PACIFICO/VOZ/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}/{NombredelAudio}.mp3";
                 xmlGrabaciones.xmlArchivolocal = _archivolocal;
 
                 //Datos para pacifico
                 xmlGrabaciones.p_nameCampaignCola = nameCampaignCola;
                 xmlGrabaciones.p_empresa = xmlEmpresa;
-                xmlGrabaciones.p_dNICliente = xmlDniCliente;
-                xmlGrabaciones.p_apellidoPaterno = xmlApellidoPaterno;
-                xmlGrabaciones.p_apellidoMaterno = xmlApellidoMaterno;
-                xmlGrabaciones.p_nombres = xmlNombres;
+                xmlGrabaciones.p_dNICliente = xmlDniCliente == "" ? "00000000" : xmlDniCliente;
+                xmlGrabaciones.p_apellidoPaterno = xmlApellidoPaterno == string.Empty ? "NN" : xmlApellidoPaterno;
+                xmlGrabaciones.p_apellidoMaterno = xmlApellidoMaterno == string.Empty ? "NN" : xmlApellidoMaterno;
+                xmlGrabaciones.p_nombres = xmlNombres == string.Empty ? "NN" : xmlNombres;
                 xmlGrabaciones.p_telefono = xmlTelefono;
-                xmlGrabaciones.p_fechaDeServicio = $"{_anio}-{_mes}-{_dia}";
+                xmlGrabaciones.p_fechaDeServicio = $"{_dia}/{_mes}/{_anio}";
                 xmlGrabaciones.p_horaDeServicio = $"{_Hour}:{_Minute}:{_Seconds}";
                 xmlGrabaciones.p_NroAsesor = xmlNumeroAsesor;
                 xmlGrabaciones.p_Proceso = xmlProceso;
@@ -488,29 +581,33 @@ namespace Grabaciones.Services.Repositorio
                         Console.WriteLine("Error: " + ex.Message.ToString());
                         throw;
                     }
-                    #endregion
+                #endregion
 
                     #region Descargar audio
                     try
                     {
-                        if(xmlGrabaciones.xmlFileStateRecording == "ARCHIVED")
-                        {
-                            
-                        }
-
                         xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
 
-                        //if (xmlGrabaciones.xmlAudioDescargado)
-                        //{
-                        //    await _ecMetodos.SubirArchivosSFTAmazon(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.eAnio,xmlGrabaciones.eMes);
-                        //}
-                        //else // if (xmlGrabaciones.xmlAudioDescargado)
-                        //{
-                        //    await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
-                        //    continue;
-                        //}
-                        
-
+                        if (xmlGrabaciones.xmlAudioDescargado)
+                        {
+                            ////subir al repositorio de ftp
+                            bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmldirectorioFTP);
+                            if (respuestaOkSFTKonecta)
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"Archivo subido correctamente al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                            }
+                            else
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                                ////subir al repositorio d amazon
+                                //  await _ecMetodos.SubirArchivosSFTAmazon(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.eAnio, xmlGrabaciones.eMes);
+                            }
+                        }
+                        else // if (xmlGrabaciones.xmlAudioDescargado)
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
+                            continue;
+                        }
 
                     }
                     catch (Exception ex)
@@ -530,18 +627,9 @@ namespace Grabaciones.Services.Repositorio
                 {
                     listXmlGrabaciones.Add(xmlGrabaciones);
                 }
-
                 #endregion
-
             } //fin del foreach de todas las conversaciones
-
-
-
-
-
         }
         #endregion
-
-
     }
 }

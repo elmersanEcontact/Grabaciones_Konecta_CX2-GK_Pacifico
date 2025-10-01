@@ -29,7 +29,6 @@ namespace Grabaciones.Services.Interface
 
         Task<string> EliminarCaracteresEspeciales(string cadena);
 
-
         Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString);
 
         Task<string> EnviarGrabaciones_a_Bucket(string nombreBucket, List<EC_CSVYanbal> listImprimirCSV, int anio, string nombredelMes, string rutaLocal);
@@ -52,17 +51,20 @@ namespace Grabaciones.Services.Interface
 
         Task<string> GetQueueName60DiasMas(AnalyticsConversation conversation, List<GC_Queue> listQueue);
 
-        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation);
+        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation, EC_ConfiguracionTransformacionXML configuracionTransformacionXML, string direction);
 
-        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(List<AnalyticsParticipant> Participants);
+        Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(AnalyticsConversation conversation,EC_ConfiguracionTransformacionXML configuracionTransformacionXML, string direction);
 
         Task CreateUpdateXMLGC(List<XmlGrabaciones> listMetadata);
 
         Task CargaSFTPAmazon(string localFilePath, string directorioRemoto, string rutaArchivoRemoto);
 
-       // Task<bool> SubirArchivosSFTAmazon(string archivo, string nombreSemana, string anio);
         Task<bool> SubirArchivosSFTPKonecta(string archivo, string periodo);
 
-        Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId, string conversationId);
+        Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId, string conversationId, EC_ConfiguracionTransformacionXML configuracionTransformacionXML, string direction);
+
+        Task<EC_ConfiguracionTransformacionXML> LeerEquivalenciasJson();
+
+        Task<bool> EnviarGrabaciones_a_Bucket2(string rutaLocal, string rutaBucket);
     }
 }

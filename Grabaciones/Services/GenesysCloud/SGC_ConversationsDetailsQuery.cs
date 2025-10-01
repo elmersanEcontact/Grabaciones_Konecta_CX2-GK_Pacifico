@@ -368,6 +368,8 @@ namespace Grabaciones.Services.GenesysCloud
             int iPageIndex = 1;
             int iPageSize = 100;
 
+            string? vConversationID = config.GetValue<string>("GenesysCloud:ConversationIdPrueba");
+
             #endregion
 
             #region  oSegmentDetailQueryPredicate
@@ -477,14 +479,33 @@ namespace Grabaciones.Services.GenesysCloud
                 //            Value = "bbbb80f3-a3c3-49e6-8551-54d75eb20f5c"
 
                 //            //inbound
-                //            //Value = "182918ee-932e-4291-9604-99edc02bcbb0"
+                //            //Value = "37cdce9e-c2e3-4d94-bbcb-c7bb430c9fd0"
                 //        }
                 //    }
                 //},
 
             };
 
-            body.ConversationFilters = oConversationDetailQueryFilter;
+            if (!string.IsNullOrEmpty(vConversationID))
+            {
+                oConversationDetailQueryFilter.Add(new ConversationDetailQueryFilter
+                {
+                    Type = ConversationDetailQueryFilter.TypeEnum.And,
+                    Predicates = new List<ConversationDetailQueryPredicate>()
+                    {
+                        new ConversationDetailQueryPredicate()
+                        {
+                            Type = ConversationDetailQueryPredicate.TypeEnum.Dimension,
+                            Dimension = ConversationDetailQueryPredicate.DimensionEnum.Conversationid,
+                            Value = vConversationID
+                        }
+                    }
+                });
+            }
+
+
+
+                body.ConversationFilters = oConversationDetailQueryFilter;
             #endregion
 
             body.Interval = rangoFechas;

@@ -39,6 +39,7 @@ using Microsoft.Win32;
 using DocumentFormat.OpenXml.Office2016.Word.Symex;
 
 using Amazon.S3;
+
 using Amazon.S3.Transfer;
 using System.Runtime.CompilerServices;
 using Amazon.Runtime.Telemetry;
@@ -46,6 +47,9 @@ using Grabaciones.Services.GenesysCloud;
 using DocumentFormat.OpenXml.Bibliography;
 using PureCloudPlatform.Client.V2.Api;
 using PureCloudPlatform.Client.V2.Client;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json.Linq;
+using RestSharp.Serializers;
 
 
 namespace Grabaciones.Services.Econtact
@@ -55,12 +59,14 @@ namespace Grabaciones.Services.Econtact
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
         private readonly IAmazonS3 _s3Client;
+        private readonly string nameBucket;
 
         public EC_Metodos(IConfiguration config, HttpClient HttpClient, IAmazonS3 s3Client)
         {
             _config = config;
             _httpClient = HttpClient;
             _s3Client = s3Client;
+            nameBucket = _config.GetValue<string>("ConfiguracionAWS:bucketName");
         }
 
         #region Crear Directorio
@@ -149,11 +155,23 @@ namespace Grabaciones.Services.Econtact
 		#region Validar el telefono y reemplazar caracteres por vacio
 		public string ReemplazarTelefonoxVacio(string telefonoxVacio)
 		{
-            int largNumero = telefonoxVacio.Length;
-            int inicio = telefonoxVacio.Length - 9;
-            string vTelefono = telefonoxVacio.Substring(inicio, 9);
+            try
+            {
+                int largNumero = telefonoxVacio.Length;
+                int inicio = telefonoxVacio.Length - 9;
+                string vTelefono = telefonoxVacio
+                    .Substring(inicio, 9)
+                    .Replace("tel:", "")
+                    .Replace("l:", "")
+                    ;
 
-            return vTelefono;
+                return vTelefono;
+            }
+            catch (Exception)
+            {
+                throw;
+
+            }
 		}
         //405651976494542
         #endregion
@@ -1266,7 +1284,6 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
-
         #region Metodo para guardar la información de metadata en Base de datos
         public async Task<string> GuardarMetadataEnBaseDatos(List<EC_CSVYanbal> listImprimirCSV, string connectionString)
         {
@@ -1379,8 +1396,11 @@ namespace Grabaciones.Services.Econtact
             var resultado = new StringBuilder();
 
             if (string.IsNullOrWhiteSpace(nombreBucket))
+            {
+                await EC_EscribirLog.EscribirLogAsync("Error|El nombre del bucket es inválido.");
                 return "Error|El nombre del bucket es inválido.";
-
+            }
+            
             if (listImprimirCSV == null || listImprimirCSV.Count == 0)
                 return "Error|La lista de grabaciones está vacía.";
 
@@ -1435,41 +1455,7 @@ namespace Grabaciones.Services.Econtact
                 return error;
             }
 
-            /*
-            foreach (var item in listImprimirCSV)
-            {
-                try
-                {
-                    string nombreArchivo = $"{item.ConversationId}_{item.IdRecording}.mp3";
-                    string rutaArchivo = item.rutacompletaAudio;
-
-                    if (string.IsNullOrWhiteSpace(rutaArchivo) || !File.Exists(rutaArchivo))
-                    {
-                        string mensajeError = $"Advertencia|Archivo no encontrado: {rutaArchivo}";
-                        await EC_EscribirLog.EscribirLogAsync(mensajeError);
-                        resultado.AppendLine(mensajeError);
-                        continue;
-                    }
-                    string envioBucket = $"Subiendo archivo: {rutaArchivo} a {nombreBucket}/{prefix + nombreArchivo}";
-                    await transferUtility.UploadAsync(rutaArchivo, nombreBucket, prefix + nombreArchivo);
-
-                    string mensajeOk = $"OK|Archivo subido: {prefix + nombreArchivo}";
-                    resultado.AppendLine(mensajeOk);
-                }
-                catch (AmazonS3Exception s3Ex)
-                {
-                    string mensajeError = $"Error S3|{s3Ex.Message}|Bucket: {nombreBucket}| (Archivo: {item.rutacompletaAudio})";
-                    await EC_EscribirLog.EscribirLogAsync(mensajeError);
-                    resultado.AppendLine(mensajeError);
-                }
-                catch (Exception ex)
-                {
-                    string mensajeError = $"Error General|{ex.Message} (Archivo: {item.rutacompletaAudio})";
-                    await EC_EscribirLog.EscribirLogAsync(mensajeError);
-                    resultado.AppendLine(mensajeError);
-                }
-            }
-            */
+           
 
             return resultado.ToString();
         }
@@ -1878,9 +1864,7 @@ namespace Grabaciones.Services.Econtact
         public async Task CreateUpdateXMLGC(List<XmlGrabaciones> listMetadata)
         {
             string fechaCreacionXML = System.DateTime.Now.AddDays(-1).ToString("yyyyMMddHHmmss");
-            string eAnio = listMetadata[0].eAnio;
-            string eMes = listMetadata[0].eMes;
-
+            bool respuestaAWS;
 
             var settings = new XmlWriterSettings
             {
@@ -1901,8 +1885,11 @@ namespace Grabaciones.Services.Econtact
                     int vn = groupMetadata.Count();
                     // Obtiene la ruta de audio del primer registro del grupo
                     string rutaBase = groupMetadata.FirstOrDefault()?.xmlRutadeAudio ?? "";
-                    string ArchivoXML = $"{rutaBase}/Resultado_{fechaCreacionXML}.xml";
+                    string rutaBucketXML = groupMetadata.FirstOrDefault()?.xmldirectorioBUCKETxml ?? "";
+                    string nombreArchivoXML = $"Resultado_{fechaCreacionXML}.xml";
+                    string ArchivoXML = $"{rutaBase}/{nombreArchivoXML}";
                     string directorioFTP = groupMetadata.FirstOrDefault()?.xmldirectorioFTP ?? "";
+                    string directorioBucket = $"{rutaBucketXML}/{nombreArchivoXML}";
 
                     using (var stream = new FileStream(ArchivoXML, FileMode.Create, FileAccess.Write, FileShare.None))
                     using (var writer = XmlWriter.Create(stream, settings))
@@ -1923,31 +1910,36 @@ namespace Grabaciones.Services.Econtact
 
                                 await EscribirElementoAsync(writer, "Empresa", iMetadata.p_empresa);
                                 await EscribirElementoAsync(writer, "DNICliente", iMetadata.p_dNICliente);
-                                await EscribirElementoAsync(writer, "ApellidoPaterno", iMetadata.p_apellidoPaterno);
-                                await EscribirElementoAsync(writer, "ApellidoMaterno", iMetadata.p_apellidoMaterno);
-                                await EscribirElementoAsync(writer, "Nombres", iMetadata.p_nombres);
-                                await EscribirElementoAsync(writer, "Telefono", iMetadata.p_telefono);
-                                await EscribirElementoAsync(writer, "FechaDeServicio", iMetadata.p_fechaDeServicio);
-                                await EscribirElementoAsync(writer, "HoraDeServicio", iMetadata.p_horaDeServicio);
-                                await EscribirElementoAsync(writer, "NroAsesor", iMetadata.p_NroAsesor);
+                                await EscribirElementoAsync(writer, "ApellidoPaternoCliente", iMetadata.p_apellidoPaterno);
+                                await EscribirElementoAsync(writer, "ApellidoMaternoCliente", iMetadata.p_apellidoMaterno);
+                                await EscribirElementoAsync(writer, "NombresCliente", iMetadata.p_nombres);
+                                await EscribirElementoAsync(writer, "TelefonoCliente", iMetadata.p_telefono);
+                                await EscribirElementoAsync(writer, "FechaVenta", iMetadata.p_fechaDeServicio);
+                                await EscribirElementoAsync(writer, "HoraVenta", iMetadata.p_horaDeServicio);
+                                await EscribirElementoAsync(writer, "DNIAsesor", iMetadata.p_NroAsesor);
                                 await EscribirElementoAsync(writer, "Proceso", iMetadata.p_Proceso);
-                                await EscribirElementoAsync(writer, "Vdn", iMetadata.p_vdn);
+                                await EscribirElementoAsync(writer, "VDN", iMetadata.p_vdn);
                                 await EscribirElementoAsync(writer, "Skill", iMetadata.p_skill);
                                 await EscribirElementoAsync(writer, "Ramo", iMetadata.p_ramo);
-                                await EscribirElementoAsync(writer, "Producto", iMetadata.p_producto);
-                                await EscribirElementoAsync(writer, "Resultado", iMetadata.p_resultado);
-                                await EscribirElementoAsync(writer, "Subresultado", iMetadata.p_subResultado);
+                                await EscribirElementoAsync(writer, "Prod", iMetadata.p_producto);
+                                await EscribirElementoAsync(writer, "Result", iMetadata.p_resultado);
+                                await EscribirElementoAsync(writer, "Subresu", iMetadata.p_subResultado);
+                                await EscribirElementoAsync(writer, "RutaAudio", iMetadata.xmldirectorioFTPxml);
 
                                 writer.WriteEndElement(); // Cierra el elemento "Llamada"
 
                             }
+                           //--- respuestaAWS = await EnviarGrabaciones_a_Bucket2(iMetadata.xmlRutaCompletaAudioMP3, $"{iMetadata.xmldirectorioBUCKETxml}/{iMetadata.xmlNombreRemotoAudio}");
                         }
                         await writer.WriteEndElementAsync(); // Registros
                         await writer.WriteEndDocumentAsync();
                         await writer.FlushAsync();
                     }
                     await EC_EscribirLog.EscribirLogAsync($"Archivo XML creado correctamente: {ArchivoXML}");
+                    
                     bool respuestaOkSFTKonecta = await SubirArchivosSFTPKonecta(ArchivoXML, directorioFTP);
+
+                    //--- respuestaAWS = await EnviarGrabaciones_a_Bucket2(ArchivoXML, directorioBucket);
                 }
             }
             catch (Exception ex)
@@ -1965,8 +1957,89 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
+        #region Enviar las grabaciones al Bucket AWS
+        public async Task<bool> EnviarGrabaciones_a_Bucket2(string rutaLocal, string rutaBucket)
+        {
+
+            
+            var transferUtility = new TransferUtility(_s3Client);
+            string nombreBucket = nameBucket; // Asegúrate que esta variable esté definida
+
+            // Validaciones
+            if (string.IsNullOrWhiteSpace(nombreBucket))
+            {
+                await EC_EscribirLog.EscribirLogAsync("Error|El nombre del bucket es inválido.");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(rutaLocal))
+            {
+                await EC_EscribirLog.EscribirLogAsync("Error|La ruta local del archivo es inválida.");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(rutaBucket))
+            {
+                await EC_EscribirLog.EscribirLogAsync("Error|La ruta del bucket es inválida.");
+                return false;
+            }
+
+            if (!File.Exists(rutaLocal))
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error|El archivo no existe: {rutaLocal}");
+                return false;
+            }
+
+            try
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Iniciando carga de archivo a S3: {rutaLocal} -> {rutaBucket} | bucket: {nameBucket}");
+
+                // Configuración opcional para mejorar la subida
+                var uploadRequest = new TransferUtilityUploadRequest
+                {
+                    FilePath = rutaLocal,
+                    BucketName = nombreBucket,
+                    Key = rutaBucket,
+                    StorageClass = S3StorageClass.Standard, // o el que necesites
+                    ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256 // opcional
+                };
+
+                await transferUtility.UploadAsync(uploadRequest);
+                await EC_EscribirLog.EscribirLogAsync($"OK|Archivo subido exitosamente: {rutaBucket}");
+                return true;
+            }
+            catch (AmazonS3Exception s3Ex)
+            {
+                string error = $"Error S3|{s3Ex.ErrorCode}: {s3Ex.Message} (Archivo: {rutaLocal} -> AWS: {rutaBucket})";
+                await EC_EscribirLog.EscribirLogAsync(error);
+                return false;
+            }
+            catch (FileNotFoundException)
+            {
+                string error = $"Error|Archivo no encontrado: {rutaLocal}";
+                await EC_EscribirLog.EscribirLogAsync(error);
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                string error = $"Error|Sin permisos para acceder al archivo: {rutaLocal}";
+                await EC_EscribirLog.EscribirLogAsync(error);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                string error = $"Error General|{ex.Message} (Archivo: {rutaLocal} -> AWS: {rutaBucket})";
+                await EC_EscribirLog.EscribirLogAsync(error);
+                return false;
+            }
+
+        }
+
+        #endregion
+
+
         #region Obtener campos para apis de pacifico
-        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation)
+        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico(CallConversation callConversation, EC_ConfiguracionTransformacionXML configuracionTransformacionXML, string direction)
         {
             EC_ParametrosApiPacifico parametros = new EC_ParametrosApiPacifico();
 
@@ -1991,7 +2064,7 @@ namespace Grabaciones.Services.Econtact
                     await EC_EscribirLog.EscribirLogAsync($"Se encontró el atributo wsIG_Id en los participantes de la conversación: {callConversation.Id} con el valor {wsIG_Id}");
 
                     #region Obtener valores
-                    parametros = await GetDatosPacificoAsync(wsIG_Id,callConversation.Id);
+                    parametros = await GetDatosPacificoAsync(wsIG_Id,callConversation.Id,configuracionTransformacionXML, direction);
                     #endregion
 
                 }
@@ -2008,37 +2081,35 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Obtener campos para apis de pacifico de 60 días a mas
-        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(List<AnalyticsParticipant> Participants)
+        public async Task<EC_ParametrosApiPacifico> ObtenerParametroPacifico60DiasMas(AnalyticsConversation conversation, EC_ConfiguracionTransformacionXML configuracionTransformacionXML, string direction)
         {
             EC_ParametrosApiPacifico parametros = new EC_ParametrosApiPacifico();
 
+            string conversationID = conversation?.ConversationId ?? string.Empty;
             try
             {
-                if (Participants == null || !Participants.Any())
+                #region primero obtener el valor de wsIG_Id  de los participantes de la conversación
+                string wsIG_Id = conversation?.Participants?
+                    .Where(p => p.Attributes?.Any() == true)
+                    .SelectMany(p => p.Attributes)
+                    .Where(a => a.Key.Equals("wsIG_Id", StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault().Value?.ToString() ?? string.Empty;
+                #endregion
+
+                if (string.IsNullOrEmpty(wsIG_Id))
                 {
-                    await EC_EscribirLog.EscribirLogAsync("No se encontraron participantes en la conversación");
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontró el atributo wsIG_Id en los participantes de la conversación: {conversationID}");
                     return parametros;
                 }
                 else
                 {
-                    // Buscar participante con atributos (generalmente el agente)
-                    var participanteConAtributos = Participants?
-                    .FirstOrDefault(p => p.Attributes?.Any() == true);
+                    // Si se encontró wsIG_Id, asignarlo a los parámetros
+                    await EC_EscribirLog.EscribirLogAsync($"Se encontró el atributo wsIG_Id en los participantes de la conversación: {conversationID} con el valor {wsIG_Id}");
 
-                    if (participanteConAtributos == null)
-                    {
-                        await EC_EscribirLog.EscribirLogAsync("No se encontró participante con atributos");
-                        return parametros;
-                    }
+                    #region Obtener valores
+                    parametros = await GetDatosPacificoAsync(wsIG_Id, conversationID, configuracionTransformacionXML, direction);
+                    #endregion
 
-                    var attributes = participanteConAtributos.Attributes;
-                    //Se obtienen los datos de los atributos
-                    //parametros = new EC_ParametrosApiPacifico
-                    //{
-                    //    dniCliente = attributes.GetValueOrDefault("wsIG_NumDoc")?.ToString() ?? string.Empty,
-                    //    id = attributes.GetValueOrDefault("wsIdContacto")?.ToString() ?? string.Empty
-                    //    // dfecha = participanteConAtributos.EndTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? string.Empty
-                    //};
                 }
 
             }
@@ -2212,7 +2283,10 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Metodo para obtener los datos desde la api de pacifico
-        public async Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId, string conversationId)
+        public async Task<EC_ParametrosApiPacifico> GetDatosPacificoAsync(string wsGcId, 
+                                                                            string conversationId, 
+                                                                            EC_ConfiguracionTransformacionXML configuracionTransformacionXML,
+                                                                            string direction)
         {
             //variable a devolver
             EC_ParametrosApiPacifico vParametrosPacifico = new EC_ParametrosApiPacifico();
@@ -2257,16 +2331,121 @@ namespace Grabaciones.Services.Econtact
                     var content = await response.Content.ReadAsStringAsync();
                     dynamic data = JsonConvert.DeserializeObject(content);
 
-                    // Extraer campos específicos
-                    string tNumDoc_c = data?.tNumDoc_c?.ToString() ?? "NNN";
-                    string tPerApellidoPaterno_c = data?.tPerApellidoPaterno_c?.ToString() ?? "NNN";
-                    string tPerApellidoMaterno_c = data?.tPerApellidoMaterno_c?.ToString() ?? "NNN";
-                    string tPerNombre_c = data?.tPerNombre_c?.ToString() ?? "NNN";
-                    string producto = data?.chOptyTipifProducto_c?.ToString() ?? "NNN";
-                    string subresultado = data?.tOptyTipifSubResultado_c?.ToString() ?? "NNN";
-                    string tVDN_c = data?.tVDN_c?.ToString() ?? "NNN";
+                    //await EC_EscribirLog.EscribirLogAsync($"✅ Datos obtenidos exitosamente para wsGcId: {wsGcId} | {data}");
+                    await EC_EscribirLog.EscribirLogAsync($"✅ Datos obtenidos exitosamente para wsGcId: {wsGcId}");
 
-                    await EC_EscribirLog.EscribirLogAsync($"✅ Producto: '{producto}', SubResultado: '{subresultado}'");
+                    // Extraer campos específicos
+                    string tNumDoc_c = data?.tNumDoc_c?.ToString() ?? "NN";
+                    string tPerApellidoPaterno_c = data?.tPerApellidoPaterno_c?.ToString() ?? "NN";
+                    string tPerApellidoMaterno_c = data?.tPerApellidoMaterno_c?.ToString() ?? "NNN";
+                    string tPerNombre_c = data?.tPerNombre_c?.ToString() ?? "NN";
+                    string producto = data?.chOptyTipifProducto_c?.ToString() ?? "NN";
+                    string subresultado = data?.tOptyTipifSubResultado_c?.ToString() ?? "NN";
+                   // string tVDN_c = data?.tVDN_c?.ToString() ?? "NN";
+
+                    string Ramo = string.Empty; 
+                    string Prod = string.Empty; 
+                    string Result = string.Empty; 
+                    string SubResu = string.Empty; 
+
+
+
+                    string tSRLineaNegocio_c = data?.tSRLineaNegocio_c?.ToString() ?? "NN";
+                    string tSRDisposicion_c = data?.tSRDisposicion_c?.ToString() ?? "NN";  
+                    string chOptyTipifProducto_c = data?.chOptyTipifProducto_c?.ToString() ?? "NN";  
+                    string tOptyTipifSubResultado_c = data?.chOptyTipifProducto_c?.ToString() ?? "NN"; 
+
+                    // servicios
+                    string dchSR_c = data?.dchSR_c?.ToString() ?? "NN";  
+                    await EC_EscribirLog.EscribirLogAsync($"dchSR_c: '{dchSR_c}'");
+                    // ventas
+                    string chOpty_c = data?.chOpty_c?.ToString() ?? "NN";
+                    await EC_EscribirLog.EscribirLogAsync($"chOpty_c: '{chOpty_c}'");
+
+
+                    #region //servicios
+                    if (data?.dchSR_c != null)
+                    {
+                        await EC_EscribirLog.EscribirLogAsync($"dchSR_c tiene valor '{dchSR_c}', se procesará como servicio");
+                        //Ramo-Producto
+                        if (data?.tSRLineaNegocio_c==null)
+                        {
+                                await EC_EscribirLog.EscribirLogAsync($"⚠️ tSRLineaNegocio_c tiene valor 'NN', se asignará 'Otros' para Ramo y Producto");
+                                Ramo = "Otros";
+                                Prod = "Otros";
+                        }
+                        else 
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"✅ Se encontró mapeo para tSRLineaNegocio_c: '{tSRLineaNegocio_c}'");
+                            var item1 = configuracionTransformacionXML.Inbound.TSRLineaNegocio[tSRLineaNegocio_c];
+                            Ramo = item1.Ramo;
+                            Prod = item1.Producto;
+                        }
+
+                        // Result-Subresultado
+                        if (data?.tSRDisposicion_c==null)
+                        {
+                                await EC_EscribirLog.EscribirLogAsync($"⚠️ tSRDisposicion_c tiene valor 'NN', se asignará 'Sin valor' para Result y SubResultado");
+                                Result = "Sin valor";
+                                SubResu = "Sin valor";
+                            
+                        }
+                        else 
+                        {
+                            var valor = configuracionTransformacionXML.Inbound.TSRDisposicion[tSRDisposicion_c];
+                            Result = valor;
+                            SubResu = valor;
+                        }
+                    }
+                    #endregion
+
+                    #region // ventas
+                    else if (data?.chOpty_c!=null)
+                    {
+                        await EC_EscribirLog.EscribirLogAsync($"chOpty_c tiene valor '{chOpty_c}', se procesará como venta");
+                        //Ramo-Producto
+                        // Buscar directamente
+                        if (data?.chOptyTipifProducto_c == null)
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"⚠️ chOptyTipifProducto_c tiene valor 'NN', se asignará 'Sin valor' para Ramo y Producto");
+                            Ramo = "Otros";
+                            Prod = "Otros";
+                        }
+                        else 
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"✅ Se encontró mapeo para chOptyTipifProducto_c: '{chOptyTipifProducto_c}'");
+                            Ramo = configuracionTransformacionXML.Outbound.ChOptyTipifProducto[chOptyTipifProducto_c];
+                            Prod = configuracionTransformacionXML.Outbound.ChOptyTipifProducto[chOptyTipifProducto_c];
+                        }
+                         
+                        // Result-Subresultado
+                        if (data?.tOptyTipifSubResultado_c == null)
+                        {
+
+                                await EC_EscribirLog.EscribirLogAsync($"⚠️ tOptyTipifSubResultado_c tiene valor 'NN', se asignará 'Sin valor' para Result y SubResultado");
+                                Result = "Sin valor";
+                                SubResu = "Sin valor";
+                        }
+                        else 
+                        {
+                            await EC_EscribirLog.EscribirLogAsync($"✅ Se encontró mapeo para tOptyTipifSubResultado_c: '{tOptyTipifSubResultado_c}'");
+                            Result = configuracionTransformacionXML.Outbound.TOptyTipifSubResultado[tOptyTipifSubResultado_c];
+                            SubResu =  configuracionTransformacionXML.Outbound.TOptyTipifSubResultado[tOptyTipifSubResultado_c];
+                        }
+                    }
+                    #endregion
+                    #region en caso dchSR_c y chOpty_c sean nulos
+                    else
+                    {
+                        await EC_EscribirLog.EscribirLogAsync($"⚠️ dchSR_c y chOpty_c tienen valor 'NN', se asignará 'Otros' para todos los campos de Ramo, Producto, y 'Sin valor' Resultado y Subresultado");
+                        Ramo = "Otros";
+                        Prod = "Otros";
+                        Result = "Sin valor";
+                        SubResu = "Sin valor";
+                    }
+                    #endregion
+
+                    await EC_EscribirLog.EscribirLogAsync($"✅ Ramo: '{Ramo}', Producto: '{Prod}', Result: '{Result}', SubResultado: '{SubResu}'");
 
                     return vParametrosPacifico = new EC_ParametrosApiPacifico
                     {
@@ -2276,31 +2455,68 @@ namespace Grabaciones.Services.Econtact
                         tPerNombre_c = tPerNombre_c,
                         chOptyTipifProducto_c = producto,
                         tOptyTipifSubResultado_c = subresultado,
-                        tVDN_c = tVDN_c,
+                        
+                        ramo = Ramo,
+                        producto = Prod,
+                        result = Result,
+                        subResu = SubResu,
                     };
     
                 }
                 else
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}|:  {response.StatusCode}: {error}");
+                    await EC_EscribirLog.EscribirLogAsync($"❌ Error  ReadAsStringAsync en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}|:  {response.StatusCode}: {error}");
                     return vParametrosPacifico;
                 }
             }
             catch (HttpRequestException httpex)
             {
-                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción HTTP: {httpex.Message}");
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error httpex en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción HTTP: {httpex.Message}");
                 return vParametrosPacifico;
             }
             catch(TaskCanceledException timeoutEx)
             {
-                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción de tiempo de espera: {timeoutEx.Message}");
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error timeoutEx en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción de tiempo de espera: {timeoutEx.Message}");
                 return vParametrosPacifico;
             }
             catch (Exception ex)
             {
-                await EC_EscribirLog.EscribirLogAsync($"❌ Error en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción: {ex.Message}");
+                await EC_EscribirLog.EscribirLogAsync($"❌ Error ex en el consumo de la api de pacifico|conversationID: {conversationId}|wsGcId: {wsGcId}| Excepción: {ex.Message}");
                 return vParametrosPacifico;
+            }
+        }
+
+        #endregion
+
+        #region Obtener los valores del archivo json
+        public async Task<EC_ConfiguracionTransformacionXML> LeerEquivalenciasJson()
+        {
+            // Construir la ruta del archivo
+            string rutaArchivo = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                             "Resource",
+                                             "transformacionXML.json");
+
+            EC_ConfiguracionTransformacionXML? _configuracionCompleta; // Allow nullability for the variable
+
+
+            if (!File.Exists(rutaArchivo))
+            {
+                await EC_EscribirLog.EscribirLogAsync($"El archivo de equivalencias no existe en la ruta: {rutaArchivo}");
+                
+            }
+            try
+            {
+                // Leer el archivo
+                string jsonContent = File.ReadAllText(rutaArchivo);
+                _configuracionCompleta = JsonConvert.DeserializeObject<EC_ConfiguracionTransformacionXML>(jsonContent);
+
+                return _configuracionCompleta;
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync($"Error al leer el archivo de equivalencias: {ex.Message}");
+                return null;
             }
         }
         #endregion

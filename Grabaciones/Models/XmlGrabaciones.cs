@@ -26,7 +26,11 @@
         public string? xmlRutaCompletaAudioGSM { get; set; }
         public string? xmlNombreAudioExcel { get; set; }
         public string? xmlUrlGCAudio { get; set; }
+        public string? xmlNombreRemotoAudio { get; set; }
         public string? xmldirectorioFTP{ get; set; }
+        public string? xmldirectorioFTPxml{ get; set; }
+        public string? xmldirectorioBUCKETxml{ get; set; }
+        public string? xmldirectorioArchivoBUCKETxml { get; set; }
         public string? xmlArchivolocal { get; set; }
         public string? xmlFileStateRecording { get; set; }
 
@@ -62,14 +66,14 @@
             public string? p_telefono { get; set; }
             public string? p_fechaDeServicio { get; set; }
             public string? p_horaDeServicio { get; set; }
-            public string? p_NroAsesor { get; set; }
+            public string? p_NroAsesor { get; set; } = "00000000";
             public string? p_Proceso { get; set; }
-            public string? p_vdn { get; set; }
-            public string? p_skill { get; set; }
-            public string? p_ramo { get; set; }
-            public string? p_producto { get; set; }
-            public string? p_resultado { get; set; }
-            public string? p_subResultado { get; set; }
+            public string? p_vdn { get; set; } = "1234567890";
+            public string? p_skill { get; set; } = "A123456789";
+            public string? p_ramo { get; set; } = "Otros";
+            public string? p_producto { get; set; } = "Otros";
+            public string? p_resultado { get; set; } = "Sin valor";
+            public string? p_subResultado { get; set; } = "Sin valor";
         #endregion
 
 
