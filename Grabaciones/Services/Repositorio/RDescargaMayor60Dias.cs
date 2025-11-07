@@ -30,6 +30,8 @@ namespace Grabaciones.Services.Repositorio
         {
             EC_EscribirLog.EscribirLog("Se inicia proceso de descarga " + FechaInicio.ToString("yyyy-MM-dd HH:mm:ss") + " - " + FechaFin.ToString("yyyy-MM-dd HH:mm:ss"));
 
+          
+
             #region Traer el numero de la semana
             string vRespuestSemana =  await _ecMetodos.ObtenerNombreSemanaUltimoDia(FechaInicio);
 
@@ -395,7 +397,6 @@ namespace Grabaciones.Services.Repositorio
                     await EC_EscribirLog.EscribirLogAsync($"Se obtinen datos Inbound de la conversación: {iconversation} - conversationId: {conversation.ConversationId}");
 
                     nameCampaignCola = await _ecMetodos.GetQueueName60DiasMas(conversation, listQueues);
-
                 }
                 else
                 {

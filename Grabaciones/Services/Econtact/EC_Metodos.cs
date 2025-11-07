@@ -50,6 +50,9 @@ using PureCloudPlatform.Client.V2.Client;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp.Serializers;
+using System.Text.RegularExpressions;
+using Renci.SshNet.Common;
+using static System.Net.WebRequestMethods;
 
 
 namespace Grabaciones.Services.Econtact
@@ -114,11 +117,11 @@ namespace Grabaciones.Services.Econtact
 
                 if (response.IsSuccessStatusCode)
                 {
-                    if (File.Exists(audiomp3))
+                    if (System.IO.File.Exists(audiomp3))
                     {
                         // Opcional: Renombrar o sobrescribir
                         EC_EscribirLog.EscribirLog($"El archivo ya existe y será sobrescrito: {audiomp3}");
-                        File.Delete(audiomp3);
+                        System.IO.File.Delete(audiomp3);
                     }
 
                     using (HttpContent content = response.Content)
@@ -127,7 +130,7 @@ namespace Grabaciones.Services.Econtact
                         await content.CopyToAsync(fileStream);
                     }
 
-                    if (File.Exists(audiomp3))
+                    if (System.IO.File.Exists(audiomp3))
                     {
                         EC_EscribirLog.EscribirLog($"Archivo descargado exitosamente: {audiomp3}");
                         return true;
@@ -165,7 +168,7 @@ namespace Grabaciones.Services.Econtact
                     .Replace("l:", "")
                     ;
 
-                return vTelefono;
+                return Regex.Replace(vTelefono, @"[^\d]", "");
             }
             catch (Exception)
             {
@@ -210,7 +213,7 @@ namespace Grabaciones.Services.Econtact
 
             string ? appConversorAudio = _config.GetValue<string>("ConfiguracionAudio:RutaConversorAudio");
 
-            if (!File.Exists(inputFile))
+            if (!System.IO.File.Exists(inputFile))
             {
                 EC_EscribirLog.EscribirLog($"Error en ConvertMp3ToGsm: {inputFile} no existe el archivo");
                 return false;
@@ -325,7 +328,7 @@ namespace Grabaciones.Services.Econtact
                                 return false;
                             }
                             //validar si se genero el archivo
-                            if (File.Exists(outputFile))
+                            if (System.IO.File.Exists(outputFile))
                             {
                             EC_EscribirLog.EscribirLog($"Éxito: El archivo de salida GSM {outputFile}, se genero de manera correcta");
 
@@ -333,7 +336,7 @@ namespace Grabaciones.Services.Econtact
                             {
                                 try
                                 {
-                                    File.Delete(inputFile);
+                                    System.IO.File.Delete(inputFile);
                                     EC_EscribirLog.EscribirLog($"Archivo {inputFile}, eliminado de forma correcta"); 
                                     break;
                                 }
@@ -965,7 +968,7 @@ namespace Grabaciones.Services.Econtact
             
             string sLogFile = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Log_" + sTime + ".txt");
 
-            if (!File.Exists(sLogFile))
+            if (!System.IO.File.Exists(sLogFile))
             {
                 sfile = new StreamWriter(sLogFile);
                 sfile.WriteLine("******************      Log   " + sTime + "       ******************");
@@ -1156,34 +1159,27 @@ namespace Grabaciones.Services.Econtact
         {
             await EC_EscribirLog.EscribirLogAsync($"Subir archivo a sftp de konect: {archivo}");
             bool respuesta = false;
-            string host = _config.GetValue<string>("SFTPConfiguration:konectaFTP");
-            string username = _config.GetValue<string>("SFTPConfiguration:userFTP");
-            string passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
+            string ? host = _config.GetValue<string>("SFTPConfiguration:konectaFTP");
+            string ? username = _config.GetValue<string>("SFTPConfiguration:userFTP");
+            string ? passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
             int puertoFTP = _config.GetValue<int>("SFTPConfiguration:puertoFTP");
-            string privateKeyFilePath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
+            string ? privateKeyFilePath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
             string remoteDirectory = directorioFTP;
 
             #region metodo para cargar archivos a SFTP de Konecta-pacifico
             using (var sftp = new SftpClient(host, puertoFTP, username, passFTP))
             {
+                sftp.OperationTimeout = TimeSpan.FromMinutes(3);
+                sftp.KeepAliveInterval = TimeSpan.FromSeconds(30);
+
+
                 try
                 {
                     sftp.Connect();
-                   await  EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
+                    await  EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
 
-                    // ✅ Crear directorios recursivamente
+                    // Crear directorios recursivamente
                     await CreateDirectoryRecursivelyAsync(sftp, remoteDirectory);
-
-                    ////// Verificar si el directorio remoto existe
-                    ////if (!sftp.Exists(remoteDirectory))
-                    ////{
-                    ////    sftp.CreateDirectory(remoteDirectory);
-                    ////    await EC_EscribirLog.EscribirLogAsync($"Directorio '{remoteDirectory}' creado.");
-                    ////}
-                    ////else
-                    ////{
-                    ////    await EC_EscribirLog.EscribirLogAsync($"El directorio '{remoteDirectory}' ya existe, se omite su creación.");
-                    ////}
 
                     string fileName = System.IO.Path.GetFileName(archivo);
                     string remoteFilePath = $"{remoteDirectory}/{fileName}";
@@ -1230,8 +1226,9 @@ namespace Grabaciones.Services.Econtact
         #endregion
 
         #region Creacion recursiva de directorios en SFTP
-        private async Task CreateDirectoryRecursivelyAsync(SftpClient sftp, string remotePath)
+        private async Task<bool> CreateDirectoryRecursivelyAsync(SftpClient sftp, string remotePath)
         {
+            bool response = false;
             try
             {
                 await EC_EscribirLog.EscribirLogAsync($"Intentando crear directorio: {remotePath}");
@@ -1243,7 +1240,8 @@ namespace Grabaciones.Services.Econtact
                 if (sftp.Exists(remotePath))
                 {
                     await EC_EscribirLog.EscribirLogAsync($"El directorio '{remotePath}' ya existe.");
-                    return;
+                    response = true;
+                    
                 }
 
                 // Dividir la ruta en partes
@@ -1275,12 +1273,15 @@ namespace Grabaciones.Services.Econtact
                 }
 
                 await EC_EscribirLog.EscribirLogAsync($"Estructura de directorios completa creada: {remotePath}");
+                response = true;
             }
             catch (Exception ex)
             {
                 await EC_EscribirLog.EscribirLogAsync($"Error en CreateDirectoryRecursively: {ex.Message}");
-                throw;
+                
             }
+
+            return response;
         }
         #endregion
 
@@ -1984,7 +1985,7 @@ namespace Grabaciones.Services.Econtact
                 return false;
             }
 
-            if (!File.Exists(rutaLocal))
+            if (!System.IO.File.Exists(rutaLocal))
             {
                 await EC_EscribirLog.EscribirLogAsync($"Error|El archivo no existe: {rutaLocal}");
                 return false;
@@ -2500,7 +2501,7 @@ namespace Grabaciones.Services.Econtact
             EC_ConfiguracionTransformacionXML? _configuracionCompleta; // Allow nullability for the variable
 
 
-            if (!File.Exists(rutaArchivo))
+            if (!System.IO.File.Exists(rutaArchivo))
             {
                 await EC_EscribirLog.EscribirLogAsync($"El archivo de equivalencias no existe en la ruta: {rutaArchivo}");
                 
@@ -2508,7 +2509,7 @@ namespace Grabaciones.Services.Econtact
             try
             {
                 // Leer el archivo
-                string jsonContent = File.ReadAllText(rutaArchivo);
+                string jsonContent = System.IO.File.ReadAllText(rutaArchivo);
                 _configuracionCompleta = JsonConvert.DeserializeObject<EC_ConfiguracionTransformacionXML>(jsonContent);
 
                 return _configuracionCompleta;
@@ -2521,5 +2522,191 @@ namespace Grabaciones.Services.Econtact
         }
         #endregion
 
+        #region Validar la conexion SFTP
+        public async Task<bool> TestConexionSFTP()
+        {
+            bool response = false;
+            string ? host = _config.GetValue<string>("SFTPConfiguration:konectaFTP");
+            string ? username = _config.GetValue<string>("SFTPConfiguration:userFTP");
+            string ? passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
+            int puertoFTP = _config.GetValue<int>("SFTPConfiguration:puertoFTP");
+
+            await EC_EscribirLog.EscribirLogAsync("========================================");
+            await EC_EscribirLog.EscribirLogAsync("TEST DE CONEXIÓN SFTP");
+            await EC_EscribirLog.EscribirLogAsync("========================================");
+            await EC_EscribirLog.EscribirLogAsync($"Host: {host}");
+            await EC_EscribirLog.EscribirLogAsync($"Puerto: {puertoFTP}");
+            await EC_EscribirLog.EscribirLogAsync($"Usuario: {username}");
+            await EC_EscribirLog.EscribirLogAsync("----------------------------------------");
+
+            // Aquí defines la huella digital que te mostró FileZilla
+            string knownFingerprint = "SHA256:6lCnDnqH54LrFh3sdsdFOxEVj5mACJ958rX2dvEwA1E";
+
+            using (var client = new SftpClient(host, puertoFTP, username, passFTP))
+            {
+                client.OperationTimeout = TimeSpan.FromMinutes(3);
+                client.KeepAliveInterval = TimeSpan.FromSeconds(30);
+
+                //// ⚙️ Este evento ayuda a debuggear handshake con la clave del servidor
+                //client.HostKeyReceived += (sender, e) =>
+                //{
+                //    Console.WriteLine("Algoritmo: " + e.HostKeyName);
+                //    Console.WriteLine("Fingerprint SHA256: " + Convert.ToBase64String(e.FingerPrint));
+                //    e.CanTrust = true; // confiar en el servidor (como FileZilla al darle "Aceptar")
+                //};
+
+                string localPath = @"D:\Grabaciones\KonectaPeruPC2\POWER_PAY\2510\POWER_PAY__251001_082151_00000000_d14b44a7-1942-4c70-96c4-f3a3f6b70b48.mp3";
+                string remoteDir = "/sftp/PACIFICO/pruebas/06112025";
+                string remoteFile = remoteDir + System.IO.Path.GetFileName(localPath);
+               
+
+                try
+                {
+                    client.Connect();
+
+                    if (client.IsConnected)
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("Conectado al servidor SFTP.");
+
+                        //  Crear directorio remoto si no existe
+
+                        await CreateDirectoryRecursivelyAsync(client, remoteDir);
+
+                        // 📤 Subir archivo
+                        using (var fileStream = new FileStream(localPath, FileMode.Open))
+                        {
+                            client.UploadFile(fileStream, remoteFile, true);
+                        }
+
+                        await EC_EscribirLog.EscribirLogAsync("Archivo subido correctamente a: " + remoteFile);
+
+                        response = true;
+                       
+                    }
+                    else
+                    {
+                        await EC_EscribirLog.EscribirLogAsync("No se pudo conectar al servidor SFTP.");
+                        response = false;
+                    }
+                    client.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error al subir el archivo: " + ex.Message);
+                    response = false;
+                }
+            }
+            return response;
+
+        }
+        #endregion
+
+        #region validar conexion SFTP y subir archivos
+        public async Task<bool> pruebaConexionSFTP()
+        {
+             
+            string ? host = _config.GetValue<string>("SFTPConfiguration:konectaFTP");
+            string ? username = _config.GetValue<string>("SFTPConfiguration:userFTP");
+            string ? passFTP = _config.GetValue<string>("SFTPConfiguration:passFTP");
+            int puertoFTP = _config.GetValue<int>("SFTPConfiguration:puertoFTP");
+            string ? privateKeyPath = _config.GetValue<string>("SFTPConfiguration:privateKeyFilePath");
+
+            await EC_EscribirLog.EscribirLogAsync("========================================");
+            await EC_EscribirLog.EscribirLogAsync("TEST DE CONEXIÓN SFTP");
+            await EC_EscribirLog.EscribirLogAsync("========================================");
+            await EC_EscribirLog.EscribirLogAsync($"Host: {host}");
+            await EC_EscribirLog.EscribirLogAsync($"Puerto: {puertoFTP}");
+            await EC_EscribirLog.EscribirLogAsync($"Usuario: {username}");
+            await EC_EscribirLog.EscribirLogAsync("----------------------------------------");
+            SftpClient ? sftp = null;
+            bool resultado = false;
+
+
+            try
+            {
+                // Verificar que el archivo de clave existe
+                if (!System.IO.File.Exists(privateKeyPath))
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"No se encontró el archivo de clave privada: {privateKeyPath}");
+                    return false;
+                }
+
+                // Crear el objeto PrivateKeyFile (sin passphrase)
+                PrivateKeyFile privateKeyFile = new PrivateKeyFile(privateKeyPath);
+
+                // Crear el ConnectionInfo con autenticación por clave privada
+                var connectionInfo = new Renci.SshNet.ConnectionInfo(host, puertoFTP, username,
+                    new PrivateKeyAuthenticationMethod(username, privateKeyFile));
+
+                // Configurar timeouts (opcional pero recomendado)
+                connectionInfo.Timeout = TimeSpan.FromSeconds(30);
+
+                // Crear y conectar el cliente SFTP
+                sftp = new SftpClient(connectionInfo);
+                sftp.Connect();
+
+                if (sftp.IsConnected)
+                {
+                    resultado = true;
+                    await EC_EscribirLog.EscribirLogAsync("");
+                    await EC_EscribirLog.EscribirLogAsync("╔════════════════════════════════════════════════════════════════╗");
+                    await EC_EscribirLog.EscribirLogAsync("║         CONEXIÓN EXITOSA   (pruebaConexionSFTP)                ║");
+                    await EC_EscribirLog.EscribirLogAsync("╚════════════════════════════════════════════════════════════════╝");
+                }
+                else
+                {
+                    await EC_EscribirLog.EscribirLogAsync(" No se pudo conectar");
+                    return false;
+                }
+            }
+            catch (SshConnectionException ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync("");
+                await EC_EscribirLog.EscribirLogAsync("╔════════════════════════════════════════════════════════════════╗");
+                await EC_EscribirLog.EscribirLogAsync("║         CONEXIÓN NO-EXITOSA (SshConnectionException)           ║");
+                await EC_EscribirLog.EscribirLogAsync("╚════════════════════════════════════════════════════════════════╝");
+                await EC_EscribirLog.EscribirLogAsync($"Mensaje: {ex.Message}");
+
+                if (ex.InnerException != null)
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Inner: {ex.InnerException.Message}");
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                await EC_EscribirLog.EscribirLogAsync("");
+                await EC_EscribirLog.EscribirLogAsync("╔════════════════════════════════════════╗");
+                await EC_EscribirLog.EscribirLogAsync("║         CONEXIÓN NO-EXITOSA            ║");
+                await EC_EscribirLog.EscribirLogAsync("╚════════════════════════════════════════╝");
+                await EC_EscribirLog.EscribirLogAsync($"Mensaje: {ex.Message}");
+
+                if (ex.InnerException != null)
+                {
+                    await EC_EscribirLog.EscribirLogAsync($"Inner: {ex.InnerException.Message}");
+                }
+
+                return false;
+            }
+
+            finally
+            {
+                if (sftp != null)
+                {
+                    if (sftp.IsConnected)
+                    {
+                        sftp.Disconnect();
+                    }
+                    sftp.Dispose();
+                }
+            }
+
+            return resultado;
+
+           
+        }
+        #endregion
+    
     }
 }

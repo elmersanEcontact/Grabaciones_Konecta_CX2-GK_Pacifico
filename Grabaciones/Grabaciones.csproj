@@ -23,6 +23,7 @@
     <PackageReference Include="Polly" Version="8.5.2" />
     <PackageReference Include="PureCloudPlatform.Client.V2" Version="205.0.0" />
     <PackageReference Include="Renci.SshNet.Async" Version="1.4.0" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
   </ItemGroup>

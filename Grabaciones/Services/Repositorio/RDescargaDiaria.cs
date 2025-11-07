@@ -232,70 +232,6 @@ namespace Grabaciones.Services.Repositorio
                 await _ecMetodos.CreateUpdateXMLGC(listXmlGrabaciones);
                 #endregion
 
-                //foreach (var iGrabaciones in listXmlGrabaciones)
-                //{
-                //    if (iGrabaciones.xmlUrlGCAudio == "NoExisteUri")
-                //    {
-                //        await EC_EscribirLog.EscribirLogAsync("No existe audio para la grabacion: " + iGrabaciones.xmlRecordingID);
-                //    }
-                //    else
-                //    {
-                //            listMetadata.Add(new EC_Metadata {
-
-                //                empresa = iGrabaciones.xmlempresa,
-                //                dNICliente = "dNICliente",
-                //                apellidoPaterno = "apellidoPaterno",
-                //                apellidoMaterno = "apellidoMaterno",
-                //                nombres = "nombres",
-                //                telefono = "telefono",
-                //                fechaDeServicio = "fechaDeServicio",
-                //                horaDeServicio = "horaDeServicio",
-                //                NroAsesor = "NroAsesor",
-                //                Proceso = "Proceso",
-                //                vdn = "vdn",
-                //                skill = "skill",
-                //                ramo = "ramo",
-                //                producto = "producto",
-                //                resultado = "resultado",
-                //                subResultado = "subResultado"
-
-                //            });
-
-                //            #region Subir archivo a FTP
-                //            //if (respuestaAudio)
-                //            //{
-                //            //    try
-                //            //    {
-
-                //            //  var result = _ecMetodos.UploadFTPAudios(iGrabaciones.xmldirectorioFTP, iGrabaciones.xmlRutaCompletaAudioGSM, iGrabaciones.xmlArchivolocal);
-
-                //            //    }
-                //            //    catch (Exception ex)
-                //            //    {
-                //            //        await EC_EscribirLog.EscribirLogAsync($"Error en UploadFTPAudios: {ex.Message.ToString()}");
-                //            //        throw;
-                //            //    }
-                //            //}
-                //            #endregion
-
-                //            #region subir a repositorio SFTP de amazon S3
-                //            //if (respuestaAudio) {
-                //            //    try
-                //            //    {
-                //            //     var resultS3 = _ecMetodos.SubirArchivosSFTAmazon(iGrabaciones.xmlRutaCompletaAudioGSM, _nombresemana, iGrabaciones.eAnio);
-                //            //    }
-                //            //    catch (Exception ex)
-                //            //    {
-                //            //        await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al S3 de Konecta: {ex.Message}");
-                //            //        throw;
-                //            //    }
-                //            //}
-                //            #endregion
-
-                //        }
-                //}
-
-
                 #region crear archivo csv por día
                 //try
                 //{
@@ -324,7 +260,7 @@ namespace Grabaciones.Services.Repositorio
 
                 #region Enviar las grabaciones a Bucket AWS
                 //await EC_EscribirLog.EscribirLogAsync($"Inicio de proceso de envio de grabaciones a Bucket");
-                //string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, "DirectorioAudio");
+                string respuestaBucketAWS = await _ecMetodos.EnviarGrabaciones_a_Bucket(nombreBucket, listImprimirCSV, anio, NombreDelMes, "DirectorioAudio");
                 #endregion
             }
             #endregion
@@ -576,6 +512,7 @@ namespace Grabaciones.Services.Repositorio
                     string _urlAudio = "";
                     string _directorioAudio = string.Empty;
                     string _directorioFTP = "";
+                    string _directorioBucket = "";
                     string _archivolocal = "";
 
                     if (!DatosMP3.MediaUris.ContainsKey("S"))
@@ -591,133 +528,138 @@ namespace Grabaciones.Services.Repositorio
                         _urlAudio = DatosMP3.MediaUris["S"].MediaUri;
                     }
 
-
                     List<User> _users = new List<User>();
                     _users = DatosMP3.Users;
                     agentId = _users.Count() > 0 ? _users[0].Username : "NN";
 
-                #endregion
+                    #endregion
 
                     direccionAudio = direccionOrigen == "OUTBOUND" ? "O" : "I";
                     string NombredelAudio = $"{_anio}{_mes}_{_anio}{_mes}{_dia}{_Hour}{_Minute}{_Seconds}_{phoneNumber}_{dniAsesor}_{xmlResultado}_{direccionAudio}"; //string.Concat(eDia, "-",eMes, "-",eAnio, "_", _RecordingId,"_", eNombreApellidos.Replace(" ", "-").Replace(@"\", "").Replace(@"/", ""), "_",_Telefono);
                     NombredelAudio = await _ecMetodos.EliminarCaracteresEspeciales(NombredelAudio);
                     await EC_EscribirLog.EscribirLogAsync($"Nombre del audio=>{NombredelAudio}");
                     _NomenclaturaAudioMP3 = NombredelAudio + "." + xmlFormato;
-                    _directorioAudio = $"{DirectorioGrabaciones}/{nameDivision}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}";
-                    _Audiomp3 = string.Concat(_directorioAudio, "/", _NomenclaturaAudioMP3);
+                //    _directorioAudio = $"{DirectorioGrabaciones}/{nameDivision}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}";
+                    _directorioAudio = $"{DirectorioGrabaciones}/{_anio}{_mes}/{nameCampaignCola}";
+                    _directorioFTP = $"{xmlRutaFtp}/{_anio}{_mes}/{nameCampaignCola}";
+                //-- $"{xmlRutaFtp}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}";
+                    _directorioBucket= $"PACIFICO/{_anio}{_mes}/{nameCampaignCola}";
+                //_Audiomp3 = string.Concat(_directorioAudio, "/", _NomenclaturaAudioMP3);
+                    _Audiomp3 = $"{_directorioAudio}/{_NomenclaturaAudioMP3}";
 
                     #region Crear el objeto xml
 
-                    xmlGrabaciones.xmlRecordingID = recordingId;
-                    xmlGrabaciones.conversationID = conversationId;
-                    xmlGrabaciones.xmlempresa = xmlEmpresa;
-                    xmlGrabaciones.xmlOrganization = xmlOrganizacion;
-                    //-- campos para yanbal
-                    xmlGrabaciones.IdRecording = recordingId;
-                    xmlGrabaciones.ConversationId = conversationId;
-                    xmlGrabaciones.Direction = direction;
-                    xmlGrabaciones.Duration = duration;
-                    xmlGrabaciones.ConversationStartTime = conversationStartTime.ToString("yyyy-MM-ddTHH:mm:ss");
-                    xmlGrabaciones.ConversationEndTime = conversationEndTime.ToString("yyyy-MM-ddTHH:mm:ss");
-                    xmlGrabaciones.Userid = userId;
-                    xmlGrabaciones.Agentid = agentId;
-                    xmlGrabaciones.WrapUpCode = wrapupcode;
-                    xmlGrabaciones.ACW = acw;
-                    xmlGrabaciones.ANI = ani;
-                    xmlGrabaciones.QueueName = nameQqueue;
-                    xmlGrabaciones.NameDivision = nameDivision;
+                        xmlGrabaciones.xmlRecordingID = recordingId;
+                        xmlGrabaciones.conversationID = conversationId;
+                        xmlGrabaciones.xmlempresa = xmlEmpresa;
+                        xmlGrabaciones.xmlOrganization = xmlOrganizacion;
+                        //-- campos para yanbal
+                        xmlGrabaciones.IdRecording = recordingId;
+                        xmlGrabaciones.ConversationId = conversationId;
+                        xmlGrabaciones.Direction = direction;
+                        xmlGrabaciones.Duration = duration;
+                        xmlGrabaciones.ConversationStartTime = conversationStartTime.ToString("yyyy-MM-ddTHH:mm:ss");
+                        xmlGrabaciones.ConversationEndTime = conversationEndTime.ToString("yyyy-MM-ddTHH:mm:ss");
+                        xmlGrabaciones.Userid = userId;
+                        xmlGrabaciones.Agentid = agentId;
+                        xmlGrabaciones.WrapUpCode = wrapupcode;
+                        xmlGrabaciones.ACW = acw;
+                        xmlGrabaciones.ANI = ani;
+                        xmlGrabaciones.QueueName = nameQqueue;
+                        xmlGrabaciones.NameDivision = nameDivision;
                    
 
-                    xmlGrabaciones.xmlRutadeAudio = _directorioAudio;
-                    xmlGrabaciones.xmlRutaCompletaAudioMP3 = _Audiomp3;
-                    xmlGrabaciones.xmlNombreAudioExcel = _NombreAudioExcel;
-                    xmlGrabaciones.eFecha = eFecha;
-                    xmlGrabaciones.eAnio = eAnio;
-                    xmlGrabaciones.eMes = eMes;
-                    xmlGrabaciones.eDia = eDia;
-                    xmlGrabaciones.eHora = eHora;
+                        xmlGrabaciones.xmlRutadeAudio = _directorioAudio;
+                        xmlGrabaciones.xmlRutaCompletaAudioMP3 = _Audiomp3;
+                        xmlGrabaciones.xmlNombreAudioExcel = _NombreAudioExcel;
+                        xmlGrabaciones.eFecha = eFecha;
+                        xmlGrabaciones.eAnio = eAnio;
+                        xmlGrabaciones.eMes = eMes;
+                        xmlGrabaciones.eDia = eDia;
+                        xmlGrabaciones.eHora = eHora;
 
-                    xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
-                    xmlGrabaciones.xmlNombreRemotoAudio = $"{_NomenclaturaAudioMP3}";
-                    xmlGrabaciones.xmldirectorioFTP = $"{xmlRutaFtp}/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}"; 
-                    xmlGrabaciones.xmldirectorioFTPxml = $"/PACIFICO/VOZ/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}/{_NomenclaturaAudioMP3}"; 
-                    xmlGrabaciones.xmldirectorioBUCKETxml = $"PACIFICO/VOZ/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}"; 
-                    xmlGrabaciones.xmldirectorioArchivoBUCKETxml = $"PACIFICO/VOZ/{direccionOrigen}/{nameCampaignCola}/{_anio}/{_mes}/{_dia}/{_NomenclaturaAudioMP3}"; 
-                    xmlGrabaciones.xmlArchivolocal = _archivolocal;
+                        xmlGrabaciones.xmlUrlGCAudio = _urlAudio;
+                        xmlGrabaciones.xmlNombreRemotoAudio = $"{_NomenclaturaAudioMP3}";
+                        xmlGrabaciones.xmldirectorioFTP = $"{_directorioFTP}"; 
+                        xmlGrabaciones.xmldirectorioFTPxml = $"{_directorioFTP}/{_NomenclaturaAudioMP3}"; 
+                        xmlGrabaciones.xmldirectorioBUCKETxml = $"{_directorioBucket}"; 
+                        xmlGrabaciones.xmldirectorioArchivoBUCKETxml = $"{_directorioBucket}/{_NomenclaturaAudioMP3}"; 
+                        xmlGrabaciones.xmlArchivolocal = _archivolocal;
 
-                    //Datos para pacifico
-                    xmlGrabaciones.p_nameCampaignCola = nameCampaignCola;
-                    xmlGrabaciones.p_empresa = xmlEmpresa;
-                    xmlGrabaciones.p_dNICliente = xmlDniCliente==""?"00000000":xmlDniCliente;
-                    xmlGrabaciones.p_apellidoPaterno = xmlApellidoPaterno == string.Empty ? "NN" : xmlApellidoPaterno;
-                    xmlGrabaciones.p_apellidoMaterno = xmlApellidoMaterno == string.Empty ? "NN" : xmlApellidoMaterno;
-                    xmlGrabaciones.p_nombres = xmlNombres == string.Empty ? "NN" : xmlNombres;
-                    xmlGrabaciones.p_telefono = xmlTelefono;
-                    xmlGrabaciones.p_fechaDeServicio = $"{_dia}/{_mes}/{_anio}";
-                    xmlGrabaciones.p_horaDeServicio = $"{_Hour}:{_Minute}:{_Seconds}";
-                    xmlGrabaciones.p_NroAsesor = xmlNumeroAsesor;
-                    xmlGrabaciones.p_Proceso = xmlProceso;
-                    xmlGrabaciones.p_vdn = xmlVdn;
-                    xmlGrabaciones.p_skill = xmlSkill;
-                    xmlGrabaciones.p_ramo = xmlRamo;
-                    xmlGrabaciones.p_producto = xmlProducto;
-                    xmlGrabaciones.p_resultado = xmlResultado;
-                    xmlGrabaciones.p_subResultado = xmlSubResultado;
+                        //Datos para pacifico
+                        xmlGrabaciones.p_nameCampaignCola = nameCampaignCola;
+                        xmlGrabaciones.p_empresa = xmlEmpresa;
+                        xmlGrabaciones.p_dNICliente = xmlDniCliente==""?"00000000":xmlDniCliente;
+                        xmlGrabaciones.p_apellidoPaterno = xmlApellidoPaterno == string.Empty ? "NN" : xmlApellidoPaterno;
+                        xmlGrabaciones.p_apellidoMaterno = xmlApellidoMaterno == string.Empty ? "NN" : xmlApellidoMaterno;
+                        xmlGrabaciones.p_nombres = xmlNombres == string.Empty ? "NN" : xmlNombres;
+                        xmlGrabaciones.p_telefono = xmlTelefono;
+                        xmlGrabaciones.p_fechaDeServicio = $"{_dia}/{_mes}/{_anio}";
+                        xmlGrabaciones.p_horaDeServicio = $"{_Hour}:{_Minute}:{_Seconds}";
+                        xmlGrabaciones.p_NroAsesor = xmlNumeroAsesor;
+                        xmlGrabaciones.p_Proceso = xmlProceso;
+                        xmlGrabaciones.p_vdn = xmlVdn;
+                        xmlGrabaciones.p_skill = xmlSkill;
+                        xmlGrabaciones.p_ramo = xmlRamo;
+                        xmlGrabaciones.p_producto = xmlProducto;
+                        xmlGrabaciones.p_resultado = xmlResultado;
+                        xmlGrabaciones.p_subResultado = xmlSubResultado;
 
 
-                #region metodo para crear directorio y descargar el audio en MP3
-                    #region Crear directorio
-                try
-                    {
-                        await _ecMetodos.CrearDirectorio(xmlGrabaciones.xmlRutadeAudio);
-                    }
-                    catch (Exception ex)
-                    {
-                        await EC_EscribirLog.EscribirLogAsync($"Error al crearDirectorio: {ex.Message.ToString()}");
-                        Console.WriteLine("Error: " + ex.Message.ToString());
-                        throw;
-                    }
-                    #endregion
-
-                    #region Descargar audio
-                    try
-                    {
-                        xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
-
-                        if (xmlGrabaciones.xmlAudioDescargado)
-                        {
-                            ////subir al repositorio de ftp
-                            bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmldirectorioFTP);
-                            if (respuestaOkSFTKonecta)
+                        #region metodo para crear directorio y descargar el audio en MP3
+                            #region Crear directorio
+                            try
                             {
-                                await EC_EscribirLog.EscribirLogAsync($"Archivo subido correctamente al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                                await _ecMetodos.CrearDirectorio(xmlGrabaciones.xmlRutadeAudio);
                             }
-                            else
+                            catch (Exception ex)
                             {
-                                await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
-                                ////subir al repositorio d amazon
-                                //  await _ecMetodos.SubirArchivosSFTAmazon(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.eAnio, xmlGrabaciones.eMes);
+                                await EC_EscribirLog.EscribirLogAsync($"Error al crearDirectorio: {ex.Message.ToString()}");
+                                Console.WriteLine("Error: " + ex.Message.ToString());
+                                throw;
                             }
-                        }
-                        else // if (xmlGrabaciones.xmlAudioDescargado)
-                        {
-                            await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
-                            continue;
-                        }
+                            #endregion
 
-                    }
-                    catch (Exception ex)
-                    {
-                        await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {xmlGrabaciones.conversationID}| recordingID: {xmlGrabaciones.xmlRecordingID}");
-                        continue;
-                    }
-                    #endregion
-                    #endregion
+                            #region Descargar audio
+                            try
+                            {
+                                xmlGrabaciones.xmlAudioDescargado = await _ecMetodos.DownloadFileAsync(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmlUrlGCAudio);
+
+                                if (xmlGrabaciones.xmlAudioDescargado)
+                                {
+                                    ////subir al repositorio de ftp
+                                    bool respuestaOkSFTKonecta = await _ecMetodos.SubirArchivosSFTPKonecta(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.xmldirectorioFTP);
+                                    if (respuestaOkSFTKonecta)
+                                    {
+                                        await EC_EscribirLog.EscribirLogAsync($"Archivo subido correctamente al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                                    }
+                                    else
+                                    {
+                                        await EC_EscribirLog.EscribirLogAsync($"Error al subir archivo al SFTP de Konecta: {xmlGrabaciones.xmlRutaCompletaAudioMP3}");
+                                        ////subir al repositorio d amazon
+                                        //  await _ecMetodos.SubirArchivosSFTAmazon(xmlGrabaciones.xmlRutaCompletaAudioMP3, xmlGrabaciones.eAnio, xmlGrabaciones.eMes);
+                                    }
+                                }
+                                else // if (xmlGrabaciones.xmlAudioDescargado)
+                                {
+                                    await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: Falló la descarga del audio. | conversationID: {xmlGrabaciones.conversationID} | recordingID: {xmlGrabaciones.xmlRecordingID}");
+                                    continue;
+                                }
+
+                            }
+                            catch (Exception ex)
+                            {
+                                await EC_EscribirLog.EscribirLogAsync($"Error en DownloadFileAsync: {ex.Message.ToString()} | conversationID: {xmlGrabaciones.conversationID}| recordingID: {xmlGrabaciones.xmlRecordingID}");
+                                continue;
+                            }
+                            #endregion
+                        #endregion
 
                     #endregion
-                        bool yaExiste = listXmlGrabaciones.Any(x =>
-                        x.conversationID == xmlGrabaciones.conversationID &&
-                        x.IdRecording == xmlGrabaciones.IdRecording);
+
+                    bool yaExiste = listXmlGrabaciones.Any(x =>
+                    x.conversationID == xmlGrabaciones.conversationID &&
+                    x.IdRecording == xmlGrabaciones.IdRecording);
 
                     if (!yaExiste)
                     {

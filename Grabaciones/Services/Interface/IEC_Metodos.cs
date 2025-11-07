@@ -66,5 +66,7 @@ namespace Grabaciones.Services.Interface
         Task<EC_ConfiguracionTransformacionXML> LeerEquivalenciasJson();
 
         Task<bool> EnviarGrabaciones_a_Bucket2(string rutaLocal, string rutaBucket);
+
+        Task<bool> TestConexionSFTP();
     }
 }

@@ -1,0 +1,8 @@
+******************      Log   20251029       ******************
+29/10/2025 15:31:35 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 15:34:16 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 15:49:23 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 16:15:42 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 16:33:25 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 16:38:24 ==>  La descarga es para el metodo menor a 60 días
+29/10/2025 17:22:25 ==>  La descarga es para el metodo menor a 60 días

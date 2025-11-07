@@ -1,0 +1,8 @@
+******************      Log   20251105       ******************
+5/11/2025 17:49:23 ==>  La descarga es para el metodo mayor a 60 días
+5/11/2025 17:50:33 ==>  La descarga es para el metodo menor a 60 días
+5/11/2025 18:01:57 ==>  La descarga es para el metodo menor a 60 días
+5/11/2025 18:02:13 ==>  La descarga es para el metodo menor a 60 días
+5/11/2025 18:03:35 ==>  La descarga es para el metodo menor a 60 días
+5/11/2025 18:05:35 ==>  La descarga es para el metodo menor a 60 días
+5/11/2025 18:08:56 ==>  La descarga es para el metodo menor a 60 días

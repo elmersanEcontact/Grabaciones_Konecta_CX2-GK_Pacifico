@@ -1,5 +1,0 @@
-******************      Log   20250815       ******************
-15/08/2025 16:03:40 ==>  La descarga es para el metodo menor a 60 días
-15/08/2025 16:13:49 ==>  La descarga es para el metodo menor a 60 días
-15/08/2025 16:21:18 ==>  La descarga es para el metodo menor a 60 días
-15/08/2025 16:23:54 ==>  La descarga es para el metodo menor a 60 días
